@@ -2,11 +2,17 @@ $schema: https://api.gitbook.com/gitbook-docs.yaml
 site:
   title: Zwiki Docs
   structure:
-    - type: space
-      key: zwiki-docs
+    - type: section
+      key: section-1
       title: Zwiki Docs
-      path: docs
+      path: zwiki-docs
       default: true
-      content:
-        directory: ./
-        language: zh
+      children:
+        - type: space
+          key: zwiki-docs
+          title: Zwiki Docs
+          path: docs
+          default: true
+          content:
+            directory: ./
+            language: zh
