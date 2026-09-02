@@ -15,6 +15,17 @@
 * [Kubernetes](kubernetes/README.md)
 * [K3s](k3s/README.md)
 
+## 开发工具与平台
+
+* [开发工具与平台](dev-platforms/README.md)
+  * [GitHub 常用组合：Wiki、静态网站与 Web/SaaS 发布](dev-platforms/github-web-publishing.md)
+
+## Zwiki 使用与维护
+
+* [Zwiki 使用与维护](wiki-ops/README.md)
+  * [写入前检查](wiki-ops/write-checklist.md)
+  * [错误回退与恢复](wiki-ops/rollback-guide.md)
+
 ## 编写与维护
 
 * [编写与维护规范](CONTRIBUTING.md)
