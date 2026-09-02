@@ -15,15 +15,13 @@
 * [Kubernetes](kubernetes/README.md)
 * [K3s](k3s/README.md)
 
-## 开发工具与平台
+## 开发
 
-* [开发工具与平台](dev-platforms/README.md)
-  * [GitHub 常用组合：Wiki、静态网站与 Web/SaaS 发布](dev-platforms/github-web-publishing.md)
-
-## 软件开发与工程
-
-* [软件开发与工程](development/README.md)
-  * [AI 辅助全栈开发规范：分阶段验收与稳定交付](development/ai-assisted-fullstack-development-workflow.md)
+* [开发](development/README.md)
+  * [AI 全栈开发规范（FDE）](development/ai-fullstack-workflow.md)
+  * [工具平台](development/tools/README.md)
+    * [GitHub：Wiki、静态站点与 Web 发布](development/tools/github-publishing.md)
+  * [开发资源](development/resources/dev-toolbox.md)
 
 ## Zwiki 使用与维护
 
