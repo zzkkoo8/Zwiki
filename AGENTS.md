@@ -13,6 +13,26 @@
 9. 脚本、配置、图片等附件应存入 GitHub，并在 Markdown 中使用相对路径引用。
 10. 禁止提交密码、Token、Cookie、私钥、客户信息及其他敏感数据。
 
+## GitBook 使用边界
+
+GitBook 只允许作为**只读诊断工具**使用，不允许作为 Zwiki 正文或导航的写入入口。
+
+允许使用 GitBook 检查：
+
+- Git Sync 是否成功；
+- 页面是否已经同步或发布；
+- 当前公开页面树、页面路径和导航层级；
+- GitHub 内容正确但 GitBook 展示异常时的发布层状态。
+
+禁止通过 GitBook 执行：
+
+- 新增、修改或删除正文；
+- 修改 `SUMMARY.md` 对应的导航结构；
+- 使用 GitBook Change Request 维护由 Git Sync 管理的内容；
+- 绕过 GitHub 直接修复 GitBook 中的 Markdown 内容。
+
+所有正文、导航、附件和回退操作必须写入 GitHub，再由 GitBook Git Sync 同步发布。
+
 ## AI 自动写入、审核与发布
 
 Zwiki 默认采用 AI 全自动维护，不要求用户手工审核 Pull Request。
@@ -67,11 +87,12 @@ GitHub 仓库：`https://github.com/zzkkoo8/Zwiki`
 当用户提供 GitBook 页面 URL 并要求修改时：
 
 1. 先确认 URL 属于 Zwiki 发布站点。
-2. 根据页面 URL、页面标题和 `SUMMARY.md` 定位 GitHub 中对应的 Markdown 源文件。
-3. 必须确认唯一对应关系后才能修改；不得仅根据 URL 猜测文件路径。
-4. 若存在多个候选文件或无法确认对应关系，应停止写入并向用户确认。
-5. 默认修改 GitHub 中的 Markdown 源文件，不直接在 GitBook 中修改正文。
-6. GitHub 更新并通过 AI 自动审核后，自动合并到 `main`，再由 GitBook Git Sync 自动同步发布。
+2. GitBook 只用于读取页面标题、路径和同步状态，不在 GitBook 中修改正文。
+3. 根据页面 URL、页面标题和 `SUMMARY.md` 定位 GitHub 中对应的 Markdown 源文件。
+4. 必须确认唯一对应关系后才能修改；不得仅根据 URL 猜测文件路径。
+5. 若存在多个候选文件或无法确认对应关系，应停止写入并向用户确认。
+6. 只修改 GitHub 中的 Markdown 源文件。
+7. GitHub 更新并通过 AI 自动审核后，自动合并到 `main`，再由 GitBook Git Sync 自动同步发布。
 
 ## 写入错误处理
 
