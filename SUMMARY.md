@@ -23,6 +23,11 @@
     * [GitHub：Wiki、静态站点与 Web 发布](development/tools/github-publishing.md)
   * [开发资源](development/resources/dev-toolbox.md)
 
+## 项目
+
+* [xmg-qa2](projects/xmg-qa2/README.md)
+  * [技术支持专家 Agent 设计稿](projects/xmg-qa2/support-agent-design.md)
+
 ## Zwiki 使用与维护
 
 * [Zwiki 使用与维护](wiki-ops/README.md)
