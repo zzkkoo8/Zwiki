@@ -21,7 +21,7 @@
 
 | 名字 | 介绍 | 安装 | 用法 | 项目 URL |
 | --- | --- | --- | --- | --- |
-| FastAPI | Python 高性能 API 框架，基于类型标注、Pydantic 和 OpenAPI，接口契约清晰，特别适合 AI 应用和前后端分离项目。 | `pip install "fastapi[standard]"` | 创建 `main.py` 后运行 `fastapi dev main.py`，默认可通过 `/docs` 验证自动生成的 OpenAPI/Swagger 文档。 | https://github.com/fastapi/fastapi |
+| FastAPI | Python 高性能 API 框架，基于类型标注、Pydantic 和 OpenAPI，接口契约清晰，特别适合 AI 应用和前后端分离项目。 | 已安装 `uv` 时执行 `uv add "fastapi[standard]"`；也可在虚拟环境中使用 pip 安装。 | 创建 `main.py` 后运行 `uv run fastapi dev`，默认可通过 `/docs` 验证自动生成的 OpenAPI/Swagger 文档。 | https://github.com/fastapi/fastapi |
 | Full Stack FastAPI Template | FastAPI 官方组织维护的完整全栈模板，已组合 React、TypeScript、Vite、Tailwind、shadcn/ui、PostgreSQL、Playwright、Pytest、Docker Compose 和 GitHub Actions。适合不想从空目录搭骨架时直接起项目。 | 在 GitHub 页面点击 **Use this template** 创建自己的仓库，然后 clone 到本地。 | 完整 Compose 启动可执行 `docker compose run --rm backend bash scripts/prestart.sh`，再执行 `docker compose watch`。也可按仓库 `development.md` 分别启动 FastAPI 和 Vite。 | https://github.com/fastapi/full-stack-fastapi-template |
 
 ## 测试与验收
