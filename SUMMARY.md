@@ -5,6 +5,7 @@
 ## 操作系统与基础设施
 
 * [Linux](linux/README.md)
+  * [Ubuntu22 内核漏洞安全加固](linux/ubuntu22-kernel-security-hardening.md)
 * [硬件](hardware/README.md)
 * [网络](network/README.md)
 
