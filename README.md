@@ -32,7 +32,7 @@ ChatGPT / Codex / 人工维护
 | [Kubernetes](kubernetes/README.md) | 集群、工作负载、网络、存储、安全与故障定位 |
 | [K3s](k3s/README.md) | 安装、节点、运行时、备份恢复、升级与排障 |
 | [开发工具与平台](dev-platforms/README.md) | GitHub、文档发布、静态站点、Web/SaaS 部署与 CI/CD |
-| [Zwiki 使用与维护](wiki-ops/README.md) | 写入前检查、错误回退与恢复 |
+| [Zwiki 使用与维护](wiki-ops/README.md) | 写入前检查、AI 自动审核、错误回退、文章编写规范和模板 |
 
 ## 内容原则
 
@@ -47,11 +47,12 @@ ChatGPT / Codex / 人工维护
 
 - AI Agent 操作规则见 [`AGENTS.md`](AGENTS.md)。
 - 修改前执行 [写入前检查](wiki-ops/write-checklist.md)。
+- 文章格式与质量遵循 [文章编写规范](CONTRIBUTING.md)。
 - 写错后按 [错误回退与恢复](wiki-ops/rollback-guide.md) 操作。
 
 ## 编写文章
 
-新增内容前请阅读[编写与维护规范](CONTRIBUTING.md)，并从以下模板选择最接近的一种：
+新增或修改文章时，从以下模板选择最接近的一种：
 
 - [通用技术文章模板](templates/technical-article.md)
 - [故障排查模板](templates/troubleshooting.md)
