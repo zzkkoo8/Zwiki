@@ -20,6 +20,11 @@
 * [开发工具与平台](dev-platforms/README.md)
   * [GitHub 常用组合：Wiki、静态网站与 Web/SaaS 发布](dev-platforms/github-web-publishing.md)
 
+## 开发资源
+
+* [开发资源](development/README.md)
+  * [AI 辅助全栈开发规范：分阶段验收与稳定交付](development/ai-assisted-fullstack-development-workflow.md)
+
 ## Zwiki 使用与维护
 
 * [Zwiki 使用与维护](wiki-ops/README.md)
