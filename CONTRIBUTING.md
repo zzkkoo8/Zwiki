@@ -42,6 +42,16 @@
 - Wiki 内部引用使用相对路径，并确保目标文件真实存在。
 - 脚本、配置和图片等附件的存放与引用方式按 [写入前检查](wiki-ops/write-checklist.md) 中的附件规则执行。
 
+## 协作与反馈
+
+Zwiki 以 GitHub `main` 为唯一事实源，正式内容修改统一走 GitHub。
+
+- 读者发现事实错误、命令错误或失效链接：提交 GitHub Issue，优先使用“文档纠错”模板。
+- 已知正确修改方式：直接修改对应 Markdown 并发起 Pull Request。
+- 多人协作：`branch → 修改 → Pull Request → review → merge main → GitBook Git Sync`。
+- GitBook 公开站点的 Page Ratings 用于轻量反馈；正式修正仍回到 GitHub Issue / Pull Request。
+- 不在 GitHub 与 GitBook 两处同时维护不同版本的正文。
+
 ## 模板
 
 根据文章类型选择最接近的模板：
