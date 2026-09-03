@@ -1,6 +1,9 @@
 > [!IMPORTANT]
-> **阅读镜像，不是事实源。** 权威设计稿位于 [zzkkoo8/xmg-qa2 → docs/design/XMG-QA2-SUPPORT-AGENT-DESIGN.md](https://github.com/zzkkoo8/xmg-qa2/blob/main/docs/design/XMG-QA2-SUPPORT-AGENT-DESIGN.md)。
-> 本次镜像对应 xmg-qa2 `main` 提交 `a2c5399f7c86c19913ca857e7745544e30e0f6c5`。后续设计修改必须先进入 xmg-qa2，再同步本页。
+> **自动生成阅读镜像，请勿直接编辑。**
+>
+> 权威源：<https://github.com/zzkkoo8/xmg-qa2/blob/main/docs/design/XMG-QA2-SUPPORT-AGENT-DESIGN.md>
+>
+> Source Commit: `a2c5399f7c86c19913ca857e7745544e30e0f6c5`
 
 # xmg-qa2 技术支持专家 Agent 设计稿
 
