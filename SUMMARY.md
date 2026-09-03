@@ -22,6 +22,7 @@
 
 * [AI](ai/README.md)
   * [AI Coding](ai/coding/README.md)
+    * [ChatGPT 与 Codex](ai/coding/chatgpt-codex.md)
     * [Vibe Coding](ai/coding/vibe-coding.md)
   * [Skills 与插件](ai/skills-plugins.md)
   * [模型与接入](ai/model-access.md)
