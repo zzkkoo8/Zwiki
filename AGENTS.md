@@ -13,6 +13,18 @@
 9. 脚本、配置、图片等附件应存入 GitHub，并在 Markdown 中使用相对路径引用。
 10. 禁止提交密码、Token、Cookie、私钥、客户信息及其他敏感数据。
 
+## 内容分类边界
+
+新增或迁移文章时优先保持 GitHub 物理目录和 GitBook 导航语义一致：
+
+- `infrastructure/`：基建，包括硬件、系统、网络、基础服务。
+- `docker/`、`kubernetes/`、`k3s/`：容器与云原生。
+- `development/`：软件开发与交付，包括前端、后端、测试、工程规范、开发/发布平台；FDE 继续放这里。
+- `ai/`：AI 专属内容，包括 Vibe Coding、Coding Agent、模型接入、API Key / Token 获取与安全配置、Skills、插件、MCP、提示词和 AI 资源。
+- `projects/`：项目阅读页或外部项目自动镜像。
+
+同一内容只能有一个权威页面。跨分类需要引用时使用 Markdown 链接，不复制同一份说明到多个目录。
+
 ## GitBook 使用边界
 
 GitBook 只允许作为**只读诊断工具**使用，不允许作为 Zwiki 正文或导航的写入入口。
