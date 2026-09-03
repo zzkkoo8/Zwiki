@@ -1,64 +1,93 @@
-# macOS 制作 FAT32 + exFAT 双分区服务器启动 U 盘
+# 制作 FAT32 + exFAT 双分区服务器启动 U 盘（macOS / Windows）
 
-当服务器安装介质需要使用 FAT/FAT32 分区启动，但安装包中存在大于 4 GB 的单文件时，可将同一个 U 盘划分为两个分区：第一个 FAT32 分区只负责启动，第二个 exFAT 分区存放大文件。服务器从 FAT32 分区启动后，再在 Linux 安装环境中挂载 exFAT 分区，并通过安装脚本支持的 `BIN_MOUNT_POINT` 指向大文件所在位置。
+当服务器安装介质必须使用 FAT/FAT32 分区启动，但安装包中存在大于 4 GB 的单文件时，可以把同一个 U 盘划分为两个分区：第一个 FAT32 分区负责启动，第二个 exFAT 分区负责存放大文件。服务器从 FAT32 分区启动进入 Linux 安装环境后，再挂载 exFAT 分区，并通过安装脚本支持的 `BIN_MOUNT_POINT` 指向大文件所在目录。
 
-> 本文以 `safeline-2-software-installer.bin` 为例。FAT32 单文件大小上限约为 4 GB，因此不能直接存放超过该限制的安装包；UEFI 可移动介质启动则以 FAT 文件系统为标准兼容方案。第二分区使用 exFAT，是为了同时兼顾 macOS 写入和 Linux 读取大文件。
+本文给出 **macOS** 和 **Windows 10/11** 两套制作方法，服务器端使用方法相同。
+
+> 本文以 `safeline-2-software-installer.bin` 为例。FAT32 单文件大小上限约为 4 GB，因此不能直接存放超过该限制的安装包；exFAT 支持大文件，但不能假设服务器固件能够直接从 exFAT 启动。
 
 ## 文档信息
 
 | 字段 | 内容 |
 | --- | --- |
 | 技术领域 | 服务器 / U 盘启动介质 |
-| 适用范围 | macOS 制作启动盘，Linux 安装环境启动 |
+| 制作端 | macOS、Windows 10/11 |
+| 启动端 | BIOS/UEFI 服务器，Linux 安装环境 |
 | 分区方案 | MBR + FAT32 `SYSTEM` + exFAT `EXFAT_PART` |
 | 文档状态 | 实操方案，目标服务器仍需按机型验证启动兼容性 |
 | 最后验证 | 2026-09-03 |
-| 来源 | 现场操作方案、UEFI Specification、Microsoft FAT32 启动介质说明 |
+| 来源 | 现场操作方案、UEFI Specification、Microsoft DiskPart 文档 |
 
 ## 1. 方案结构
 
-示例 U 盘：
+逻辑结构：
 
 ```text
-/dev/disk2                U 盘物理磁盘（macOS）
-├── disk2s1  FAT32  SYSTEM       60%   启动文件、install.sh 等
-└── disk2s2  exFAT  EXFAT_PART   剩余  safeline-2-software-installer.bin
-                                      safeline-2-software-installer.bin.password
+U 盘
+├── 分区 1：FAT32  SYSTEM
+│   └── 启动文件、install.sh、除大文件外的安装文件
+└── 分区 2：exFAT  EXFAT_PART
+    ├── safeline-2-software-installer.bin
+    └── safeline-2-software-installer.bin.password
 ```
 
 文件放置规则：
 
 - `SYSTEM`：存放原安装介质中除以下两个文件以外的所有文件。
-- `EXFAT_PART`：只存放：
+- `EXFAT_PART`：存放：
   - `safeline-2-software-installer.bin`
   - `safeline-2-software-installer.bin.password`
 
-将 `.bin` 和 `.password` 放在同一数据分区，避免安装脚本查找大文件时路径不一致。
+将 `.bin` 和 `.password` 放在同一数据分区，避免安装脚本查找路径不一致。
 
 ## 2. 原理与适用边界
 
-### 为什么不能全部放 FAT32
+### 2.1 为什么不能全部放 FAT32
 
-FAT32 的单文件大小上限约为 4 GB。即使 U 盘本身有几十 GB 或几百 GB，只要某一个文件超过 FAT32 的单文件限制，该文件就无法正常复制进去。
+FAT32 的单文件大小上限约为 4 GB。即使 U 盘总容量为 64 GB、128 GB 或更大，只要某一个文件超过 FAT32 单文件限制，就无法正常复制到该分区。
 
-### 为什么启动分区仍使用 FAT32
+### 2.2 为什么启动分区仍使用 FAT32
 
-UEFI 规范要求固件支持 FAT 系列文件系统作为 EFI 启动文件系统，可移动介质通常从 FAT 分区中的 EFI 启动文件加载。exFAT 适合存放大文件，但不能假设服务器固件能够直接从 exFAT 启动。
+UEFI 可移动介质启动通常依赖 FAT 文件系统中的 EFI 启动文件。exFAT 适合存放大文件，但服务器 BIOS/UEFI 固件不一定具备 exFAT 启动能力。
 
-因此本方案将“启动兼容性”和“大文件存储”分离：
+因此将两个职责分离：
 
 ```text
-FAT32：负责启动
-exFAT：负责存放 >4 GB 安装包
+FAT32：负责固件启动兼容性
+exFAT：负责存放 >4 GB 安装文件
 ```
 
-### 为什么示例使用 MBR
+### 2.3 为什么示例使用 MBR
 
-本方案使用 MBR，主要考虑不同代际服务器的启动兼容性。UEFI-only 设备也可能支持 GPT，但具体以服务器厂商要求和现场固件行为为准。如果目标服务器明确要求 GPT，可将分区表类型改为 GPT 后重新验证。
+本方案使用 MBR，主要考虑不同代际服务器和 Legacy BIOS/UEFI 混合环境的兼容性。
 
-## 3. macOS：确认 U 盘设备
+如果目标服务器厂商明确要求 GPT/UEFI，应按设备要求改用 GPT，并重新验证启动行为，不应机械套用本文的 MBR 参数。
 
-先查看所有磁盘：
+### 2.4 macOS 和 Windows 分区大小为什么不同
+
+macOS 示例沿用现场验证方案：
+
+```text
+SYSTEM      60%
+EXFAT_PART  剩余空间
+```
+
+Windows 内置格式化工具对新建 FAT32 大卷存在约 32 GB 的格式化限制，因此 Windows 示例将 `SYSTEM` 控制在约 30 GB：
+
+```text
+SYSTEM      30000 MB
+EXFAT_PART  剩余空间
+```
+
+只要 `SYSTEM` 足够容纳除大 `.bin` 文件外的启动介质内容即可，不要求两个平台使用完全相同的容量比例。
+
+---
+
+# 3. macOS 制作方法
+
+## 3.1 确认 U 盘设备
+
+查看磁盘：
 
 ```bash
 diskutil list
@@ -70,7 +99,7 @@ diskutil list
 /dev/disk2
 ```
 
-建议继续检查设备属性：
+进一步核实：
 
 ```bash
 diskutil info /dev/disk2 | egrep 'Device / Media Name|Disk Size|Protocol|Internal'
@@ -82,9 +111,9 @@ diskutil info /dev/disk2 | egrep 'Device / Media Name|Disk Size|Protocol|Interna
 - `Protocol` 通常为 USB。
 - `Internal` 应为 `No`。
 
-> **高风险操作：** 后面的 `partitionDisk` 和 `eraseDisk` 会清空整个目标磁盘。不要仅凭 `/dev/disk2` 这个编号复制执行；U 盘重新插拔后编号可能变化。
+> **高风险操作：** 后面的 `partitionDisk` 和 `eraseDisk` 会清空整个目标磁盘。U 盘重新插拔后 `/dev/diskN` 编号可能变化，每次都必须重新确认。
 
-## 4. macOS：创建 FAT32 + exFAT 双分区
+## 3.2 创建 FAT32 + exFAT 双分区
 
 确认目标 U 盘确实为 `/dev/disk2` 后执行：
 
@@ -96,55 +125,42 @@ sudo diskutil partitionDisk /dev/disk2 MBR FAT32 SYSTEM 60% exFAT EXFAT_PART R
 
 | 参数 | 含义 |
 | --- | --- |
-| `/dev/disk2` | 要重建分区的 U 盘物理磁盘 |
-| `MBR` | 使用 MBR 分区表 |
-| `FAT32 SYSTEM 60%` | 第一个 FAT32 分区，卷标 `SYSTEM`，占 60% |
-| `exFAT EXFAT_PART R` | 第二个 exFAT 分区，卷标 `EXFAT_PART`，占用剩余空间 |
+| `/dev/disk2` | U 盘物理磁盘 |
+| `MBR` | MBR 分区表 |
+| `FAT32 SYSTEM 60%` | FAT32 启动分区，卷标 `SYSTEM` |
+| `exFAT EXFAT_PART R` | exFAT 数据分区，使用剩余空间 |
 
-`60%` 不是强制比例，只要 `SYSTEM` 足够容纳启动文件及除大文件以外的安装内容即可。
-
-创建完成后验证：
+创建后检查：
 
 ```bash
 diskutil list /dev/disk2
 ```
 
-预期可以看到两个分区，并且访达中通常会同时出现：
+访达中通常会看到：
 
 ```text
 SYSTEM
 EXFAT_PART
 ```
 
-## 5. macOS：复制安装文件
+## 3.3 复制安装文件
 
-### SYSTEM 分区
-
-将原安装介质中除以下两个文件外的所有内容复制到 `SYSTEM`：
+将除以下两个文件外的全部安装介质文件复制到 `SYSTEM`：
 
 ```text
 safeline-2-software-installer.bin
 safeline-2-software-installer.bin.password
 ```
 
-### EXFAT_PART 分区
+将这两个文件复制到 `EXFAT_PART` 根目录。
 
-将这两个文件复制到 `EXFAT_PART` 根目录：
-
-```text
-safeline-2-software-installer.bin
-safeline-2-software-installer.bin.password
-```
-
-复制后检查：
+检查大文件：
 
 ```bash
 ls -lh /Volumes/EXFAT_PART/safeline-2-software-installer.bin*
 ```
 
-### 推荐：生成 SHA256 校验文件
-
-为了确认大文件在复制和启动后没有损坏，可在 macOS 上生成校验文件并放到 `SYSTEM`：
+推荐生成 SHA256 校验文件：
 
 ```bash
 (cd /Volumes/EXFAT_PART && shasum -a 256 safeline-2-software-installer.bin) > /Volumes/SYSTEM/safeline-2-software-installer.bin.sha256
@@ -156,9 +172,157 @@ ls -lh /Volumes/EXFAT_PART/safeline-2-software-installer.bin*
 diskutil eject /dev/disk2
 ```
 
-## 6. 服务器：从 U 盘启动后识别两个分区
+---
 
-进入安装环境后，不要默认 U 盘一定是 `/dev/sdc`。先检查：
+# 4. Windows 制作方法
+
+推荐使用 Windows 自带的 **PowerShell + DiskPart**，无需安装第三方分区软件。
+
+> `clean` 会立即删除所选磁盘现有分区。以下示例中的 `Disk 2` 只是示例，必须根据实际 U 盘重新确认。
+
+## 4.1 确认 U 盘编号
+
+以管理员身份打开 PowerShell，执行：
+
+```powershell
+Get-Disk | Sort-Object Number | Format-Table Number,FriendlyName,BusType,PartitionStyle,@{N='SizeGB';E={[math]::Round($_.Size/1GB,1)}}
+```
+
+重点确认：
+
+- `BusType` 为 USB。
+- 容量与 U 盘一致。
+- `FriendlyName` 与 U 盘型号基本一致。
+
+也可以进入 DiskPart 再次确认：
+
+```text
+diskpart
+list disk
+select disk 2
+detail disk
+```
+
+只有在 `detail disk` 显示的设备确实为目标 U 盘时才继续。
+
+## 4.2 使用 DiskPart 创建双分区
+
+以下示例假设 U 盘为 `Disk 2`，`SYSTEM` 分区设置为 30000 MB。
+
+以管理员身份打开 CMD 或 PowerShell：
+
+```text
+diskpart
+```
+
+然后逐条执行：
+
+```text
+list disk
+select disk 2
+detail disk
+clean
+convert mbr
+create partition primary size=30000
+format fs=fat32 quick label=SYSTEM
+active
+assign letter=S
+create partition primary
+format fs=exfat quick label=EXFAT_PART
+assign letter=E
+list partition
+list volume
+exit
+```
+
+完成后的预期结构：
+
+```text
+S:  FAT32  SYSTEM       约 30 GB
+E:  exFAT  EXFAT_PART   剩余空间
+```
+
+说明：
+
+- `clean`：删除 U 盘现有分区信息。
+- `convert mbr`：使用 MBR 分区表。
+- `size=30000`：创建约 30 GB 的 FAT32 启动分区。
+- `active`：为 Legacy BIOS/MBR 启动提供活动分区标记；纯 UEFI 环境通常不依赖此标记。如果该命令在特定可移动介质上报错，可先跳过并按服务器实际启动方式验证。
+- 第二个 `create partition primary` 未指定大小，因此使用全部剩余空间。
+
+> Windows 原生 FAT32 格式化通常不适合创建超过约 32 GB 的新 FAT32 卷。如果除 `.bin` 外的启动文件仍然超过约 30 GB，优先使用本文 macOS 方法，或重新评估安装介质拆分方式，不建议为了方便随意使用来源不明的分区工具。
+
+## 4.3 图形界面验证
+
+按：
+
+```text
+Win + X → 磁盘管理
+```
+
+确认同一个 U 盘存在两个主分区：
+
+```text
+SYSTEM      FAT32
+EXFAT_PART  exFAT
+```
+
+也可以在 PowerShell 检查：
+
+```powershell
+Get-Volume | Where-Object FileSystemLabel -in 'SYSTEM','EXFAT_PART' | Format-Table DriveLetter,FileSystemLabel,FileSystem,Size,SizeRemaining
+```
+
+## 4.4 复制安装文件
+
+最简单的方法是在资源管理器中复制：
+
+- `S:\`：放除 `.bin` 和 `.password` 外的所有文件。
+- `E:\`：放 `.bin` 和 `.password`。
+
+如果原安装介质已经解压到 `C:\install-media`，也可以使用命令：
+
+```cmd
+robocopy C:\install-media S:\ /E /XF safeline-2-software-installer.bin safeline-2-software-installer.bin.password
+copy /Y C:\install-media\safeline-2-software-installer.bin E:\
+copy /Y C:\install-media\safeline-2-software-installer.bin.password E:\
+```
+
+确认文件：
+
+```powershell
+Get-Item E:\safeline-2-software-installer.bin,E:\safeline-2-software-installer.bin.password | Format-Table Name,Length
+```
+
+## 4.5 生成 Linux 可直接校验的 SHA256 文件
+
+在 PowerShell 执行：
+
+```powershell
+$File='E:\safeline-2-software-installer.bin'
+$Hash=(Get-FileHash $File -Algorithm SHA256).Hash.ToLower()
+"$Hash  safeline-2-software-installer.bin" | Set-Content -Encoding ascii S:\safeline-2-software-installer.bin.sha256
+```
+
+这样服务器启动后可以直接使用：
+
+```bash
+sha256sum -c /media/sdc1/safeline-2-software-installer.bin.sha256
+```
+
+复制完成后，在任务栏中安全弹出 U 盘。
+
+---
+
+# 5. 服务器启动后的公共操作
+
+无论 U 盘由 macOS 还是 Windows 制作，服务器端步骤相同。
+
+## 5.1 识别 U 盘和两个分区
+
+进入 Linux 安装环境后，不要默认 U 盘一定是 `/dev/sdc`。
+
+执行：
 
 ```bash
 lsblk -o NAME,TRAN,SIZE,FSTYPE,LABEL,MOUNTPOINTS,MODEL
@@ -173,7 +337,7 @@ blkid
 - 第一分区卷标为 `SYSTEM`。
 - 第二分区卷标为 `EXFAT_PART`。
 
-以下步骤假设现场识别结果为：
+以下步骤假设识别结果为：
 
 ```text
 /dev/sdc1  SYSTEM
@@ -182,14 +346,14 @@ blkid
 
 实际设备名不同时，后续命令必须同步替换。
 
-可单独确认文件系统：
+单独确认：
 
 ```bash
 blkid /dev/sdc1
 blkid /dev/sdc2
 ```
 
-## 7. 挂载两个分区
+## 5.2 挂载两个分区
 
 先检查是否已经自动挂载：
 
@@ -198,33 +362,23 @@ findmnt -S /dev/sdc1
 findmnt -S /dev/sdc2
 ```
 
-如果未挂载，创建挂载点：
+如果未挂载：
 
 ```bash
 mkdir -p /media/sdc1 /media/sdc2
-```
-
-挂载 FAT32 启动分区：
-
-```bash
 mount -t vfat /dev/sdc1 /media/sdc1
-```
-
-挂载 exFAT 大文件分区：
-
-```bash
 mount -t exfat /dev/sdc2 /media/sdc2
 ```
 
-如果需要让当前普通用户读取，可按现场环境增加：
+如果以普通用户操作 exFAT，可按需要使用：
 
 ```bash
 mount -t exfat /dev/sdc2 /media/sdc2 -o uid=$(id -u),gid=$(id -g),umask=022
 ```
 
-安装环境通常以 root 运行，此时不需要额外指定 `uid/gid`。
+安装环境通常直接使用 root，此时无需额外指定 `uid/gid`。
 
-验证挂载结果：
+验证：
 
 ```bash
 findmnt /media/sdc1
@@ -232,9 +386,7 @@ findmnt /media/sdc2
 df -hT | grep -E '/media/sdc[12]'
 ```
 
-> 原方案中的 `df -hT | grep /mnt` 与实际挂载点 `/media/sdc1`、`/media/sdc2` 不一致，本文已修正。
-
-### exFAT 挂载失败
+## 5.3 exFAT 挂载失败
 
 如果出现：
 
@@ -242,31 +394,31 @@ df -hT | grep -E '/media/sdc[12]'
 unknown filesystem type 'exfat'
 ```
 
-先尝试加载内核模块：
+先尝试：
 
 ```bash
 modprobe exfat
 mount -t exfat /dev/sdc2 /media/sdc2
 ```
 
-如果仍然失败，说明当前启动环境没有可用的 exFAT 驱动。此时不要格式化分区或继续安装，应先更换支持 exFAT 的安装环境，或按目标安装环境实际支持的文件系统重新设计第二分区。
+如果仍失败，说明当前安装环境缺少可用的 exFAT 支持。此时不要格式化分区或继续安装，应更换支持 exFAT 的安装环境，或重新设计第二分区文件系统。
 
-## 8. 校验大文件
+## 5.4 校验大文件
 
-确认文件存在：
+检查文件：
 
 ```bash
 ls -lh /media/sdc2/safeline-2-software-installer.bin*
 ```
 
-如果前面已经生成 SHA256 文件，执行：
+存在 SHA256 文件时：
 
 ```bash
 cd /media/sdc2
 sha256sum -c /media/sdc1/safeline-2-software-installer.bin.sha256
 ```
 
-预期结果：
+正常结果：
 
 ```text
 safeline-2-software-installer.bin: OK
@@ -274,28 +426,37 @@ safeline-2-software-installer.bin: OK
 
 校验失败时不要继续安装，应重新复制安装包。
 
-## 9. 安装前确认 BIN_MOUNT_POINT 支持
+## 5.5 确认 install.sh 支持 BIN_MOUNT_POINT
 
-不同版本的安装脚本可能不同。执行前先确认当前 `install.sh` 确实使用了 `BIN_MOUNT_POINT`：
+不同版本安装脚本可能不同，先检查：
 
 ```bash
 cd /media/sdc1
 grep -n 'BIN_MOUNT_POINT' ./install.sh
 ```
 
-有匹配结果：可以继续使用本文的双分区方案。
+有匹配结果：可以继续使用双分区方案。
 
-无匹配结果：说明当前脚本版本可能不支持通过该变量指定安装包位置，不要直接假设该方案兼容当前版本。
+无匹配结果：当前脚本版本可能不支持通过环境变量指定安装包目录，不应直接继续。
 
-## 10. 执行安装
+## 5.6 确认系统安装目标盘
 
-再次确认系统目标盘，避免把 U 盘当作安装目标：
+再次检查所有磁盘：
 
 ```bash
 lsblk -o NAME,TRAN,SIZE,TYPE,FSTYPE,MOUNTPOINTS,MODEL
 ```
 
-本文示例假设真正的系统安装目标为 `sda`，U 盘为 `sdc`。
+本文示例假设：
+
+```text
+sda = 服务器目标系统盘
+sdc = 启动 U 盘
+```
+
+必须根据实际容量和型号确认，不要仅根据盘符猜测。
+
+## 5.7 执行安装
 
 进入 FAT32 启动分区：
 
@@ -303,49 +464,61 @@ lsblk -o NAME,TRAN,SIZE,TYPE,FSTYPE,MOUNTPOINTS,MODEL
 cd /media/sdc1
 ```
 
-推荐将环境变量和脚本放在同一条命令中执行：
+推荐直接在同一条命令中传递变量：
 
 ```bash
 BIN_MOUNT_POINT=/media/sdc2 ./install.sh sda
 ```
 
-也可以显式导出变量：
+或者：
 
 ```bash
 export BIN_MOUNT_POINT=/media/sdc2
 ./install.sh sda
 ```
 
-> 不建议只执行 `BIN_MOUNT_POINT=/media/sdc2` 后直接运行 `./install.sh sda`。这种写法只创建当前 Shell 变量，未 `export` 时子进程通常无法继承该变量。
+不要使用下面这种方式后直接启动子进程：
 
-> **高风险操作：** `./install.sh sda` 可能重新分区、格式化或覆盖 `sda`。必须先通过 `lsblk`、磁盘容量和型号确认 `sda` 是目标系统盘，而不是 U 盘或其他数据盘。
+```bash
+BIN_MOUNT_POINT=/media/sdc2
+./install.sh sda
+```
 
-## 11. 常见问题
+因为未 `export` 的普通 Shell 变量通常不会传递给 `install.sh` 子进程。
 
-### 服务器看不到 EXFAT_PART，但可以从 SYSTEM 启动
+> **高风险操作：** `./install.sh sda` 可能重新分区、格式化或覆盖 `sda`。执行前必须确认 `sda` 是目标系统盘，不是 U 盘或其他数据盘。
 
-先进入 Linux 安装环境后执行：
+---
+
+# 6. 常见问题
+
+## 6.1 可以从 SYSTEM 启动，但服务器看不到 EXFAT_PART
+
+执行：
 
 ```bash
 lsblk -f
 blkid
 ```
 
-只要内核能识别第二个分区，固件阶段无需能够读取 exFAT；exFAT 分区只在 Linux 启动后使用。
+固件阶段不需要读取 `EXFAT_PART`。只要 Linux 启动后能够识别并挂载第二分区即可。
 
-### 服务器完全无法从 U 盘启动
+如果第二分区存在但不能挂载，重点检查 exFAT 驱动支持。
 
-依次检查：
+## 6.2 服务器完全无法从 U 盘启动
+
+依次确认：
 
 1. BIOS/UEFI 是否允许 USB Boot。
-2. 是否选择了正确的 UEFI/Legacy 启动项。
-3. `SYSTEM` 是否仍为第一个 FAT32 分区。
-4. 启动文件是否完整复制到 `SYSTEM`。
-5. 目标服务器是否对 MBR/GPT 有明确要求。
+2. 是否选择正确的 UEFI/Legacy 启动项。
+3. `SYSTEM` 是否为第一个 FAT32 分区。
+4. 启动文件是否完整复制到 `SYSTEM` 根目录结构中。
+5. 服务器是否明确要求 GPT 或特定启动模式。
+6. Windows 制作时可尝试确认 MBR `SYSTEM` 分区已设置 `active`，但纯 UEFI 机器不依赖该标记。
 
-### install.sh 找不到 .bin 文件
+## 6.3 install.sh 找不到 .bin
 
-检查：
+执行：
 
 ```bash
 ls -lh /media/sdc2/safeline-2-software-installer.bin
@@ -353,70 +526,135 @@ printf '%s\n' "$BIN_MOUNT_POINT"
 grep -n 'BIN_MOUNT_POINT' /media/sdc1/install.sh
 ```
 
-重点确认：
+确认：
 
-- 第二分区已经挂载。
-- `.bin` 和 `.password` 文件名没有改变。
-- 当前安装脚本版本支持 `BIN_MOUNT_POINT`。
-- 环境变量已经通过“同一行赋值”或 `export` 传入脚本。
+- `/media/sdc2` 已挂载。
+- `.bin` 和 `.password` 文件名未改变。
+- 当前安装脚本支持 `BIN_MOUNT_POINT`。
+- 环境变量使用同行赋值或 `export` 传给脚本。
 
-## 12. 备选方案
+## 6.4 Windows 的 `format fs=fat32` 报卷太大
 
-如果目标服务器或安装环境对单 U 盘双分区兼容性不好，可使用两个 U 盘：
+Windows 原生工具对创建大型 FAT32 卷有限制。
+
+优先处理方式：
+
+1. 把 `SYSTEM` 缩小到 30 GB 左右。
+2. 确认除 `.bin` 外的启动文件可以放入 `SYSTEM`。
+3. 剩余全部空间给 exFAT。
+4. 如果 `SYSTEM` 确实必须超过约 32 GB，优先改用 macOS 制作方案。
+
+不要把 FAT32 和 exFAT 的职责颠倒，否则可能造成服务器无法启动。
+
+---
+
+# 7. 备选方案：两个 U 盘
+
+如果目标服务器或安装环境对单 U 盘双分区兼容性不好，可以使用两个 U 盘：
 
 ```text
-U盘 1：FAT32，仅负责启动
-U盘 2：exFAT，仅存放大文件
+U 盘 1：FAT32，仅负责启动
+U 盘 2：exFAT，仅存放 .bin 和 .password
 ```
 
-启动进入 Linux 后挂载第二个 U 盘，再将 `BIN_MOUNT_POINT` 指向它的挂载目录。该方案会增加一个物理介质，但逻辑更简单，也避免部分旧固件对多分区 U 盘处理异常。
+进入 Linux 后挂载第二个 U 盘，再把 `BIN_MOUNT_POINT` 指向第二个 U 盘的挂载目录。
 
-不建议默认采用“把大文件切成多个小文件”的方案，除非安装脚本明确支持分片或安装前有可靠的重组流程。
+该方案增加一个物理介质，但结构更简单，也能避开部分旧服务器对多分区可移动介质处理不一致的问题。
 
-## 13. 恢复 U 盘为单分区
+不建议默认把大文件拆成多个小文件，除非安装脚本明确支持分片或安装前存在可靠的重组流程。
 
-如果后续不再需要双分区，可在 macOS 上将整个 U 盘恢复为单个 FAT32 分区。
+---
 
-再次通过 `diskutil list` 确认 U 盘编号后执行：
+# 8. 恢复 U 盘为普通单分区
+
+## 8.1 macOS
+
+重新确认 U 盘编号：
+
+```bash
+diskutil list
+```
+
+确认后恢复单个 FAT32 分区：
 
 ```bash
 sudo diskutil eraseDisk FAT32 CT /dev/disk2
 ```
 
-完成后验证：
+验证：
 
 ```bash
 diskutil list /dev/disk2
 ```
 
-> `eraseDisk` 会删除 U 盘上的全部现有分区和文件，执行前必须确认设备编号。
+> `eraseDisk` 会删除整个 U 盘上的全部分区和文件。
 
-## 14. 最短操作流程
+## 8.2 Windows
+
+管理员终端执行：
 
 ```text
-macOS：diskutil list 确认 U 盘
+diskpart
+list disk
+select disk 2
+detail disk
+clean
+convert mbr
+create partition primary
+format fs=exfat quick label=CT
+assign
+exit
+```
+
+对于大于 32 GB 的普通 U 盘，恢复为 exFAT 通常最省事。
+
+如果 U 盘不超过约 32 GB，并明确需要 FAT32，可将格式化命令改为：
+
+```text
+format fs=fat32 quick label=CT
+```
+
+---
+
+# 9. 最短操作流程
+
+```text
+macOS
+  diskutil list
   ↓
-MBR 分成 FAT32 SYSTEM + exFAT EXFAT_PART
+  diskutil partitionDisk → FAT32 SYSTEM + exFAT EXFAT_PART
+
+Windows
+  Get-Disk / diskpart list disk
   ↓
-SYSTEM 放启动文件，EXFAT_PART 放 .bin + .password
+  clean + convert mbr
+  ↓
+  FAT32 SYSTEM（约 30 GB）+ exFAT EXFAT_PART
+
+共同步骤
+  ↓
+SYSTEM：除 .bin/.password 外的全部启动文件
+EXFAT_PART：.bin + .password
   ↓
 服务器从 SYSTEM 启动
   ↓
-lsblk/blkid 识别两个 U 盘分区
+lsblk / blkid 确认 U 盘两个分区
   ↓
-挂载 SYSTEM 和 EXFAT_PART
+mount SYSTEM + EXFAT_PART
   ↓
-校验大文件
+sha256sum 校验大文件
   ↓
-确认 install.sh 支持 BIN_MOUNT_POINT
+grep 确认 install.sh 支持 BIN_MOUNT_POINT
   ↓
-确认 sda 是目标系统盘
+确认 sda 是服务器目标系统盘
   ↓
 BIN_MOUNT_POINT=/media/sdc2 ./install.sh sda
 ```
 
 ## 相关资料
 
-- UEFI Specification 2.11：<https://uefi.org/specs/UEFI/2.11/>
-- UEFI File System / Removable Media 说明：<https://uefi.org/specs/UEFI/2.11/13_Protocols_Media_Access.html>
-- Microsoft：FAT32 启动 U 盘及 4 GB 单文件限制：<https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/install-windows-from-a-usb-flash-drive?view=windows-11>
+- UEFI Specification：<https://uefi.org/specifications>
+- UEFI Media Access / File System：<https://uefi.org/specs/UEFI/2.11/13_Protocols_Media_Access.html>
+- Microsoft DiskPart：<https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/diskpart>
+- Microsoft `create partition primary`：<https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/create-partition-primary>
+- Microsoft `format`：<https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/format>
