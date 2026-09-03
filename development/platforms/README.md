@@ -4,7 +4,7 @@
 
 ## 当前内容
 
-- [GitHub：Wiki、静态站点与 Web 发布](github-publishing.md)
+- [GitHub 发布](github-publishing.md)
 
 ## 边界
 
