@@ -25,9 +25,7 @@ ChatGPT / Codex / 人工维护
 
 | 分类 | 主要内容 |
 | --- | --- |
-| [Linux](linux/README.md) | 系统管理、存储、网络、安全、性能与排障 |
-| [硬件](hardware/README.md) | 服务器、CPU、内存、磁盘、RAID、网卡与 BMC |
-| [网络](network/README.md) | TCP/IP、路由交换、DNS、TLS、代理、负载均衡与抓包 |
+| [基建](infrastructure/README.md) | 硬件、系统、网络、基础服务与通用运维 |
 | [Docker](docker/README.md) | Engine、镜像、容器、Compose、网络、存储与排障 |
 | [Kubernetes](kubernetes/README.md) | 集群、工作负载、网络、存储、安全与故障定位 |
 | [K3s](k3s/README.md) | 安装、节点、运行时、备份恢复、升级与排障 |

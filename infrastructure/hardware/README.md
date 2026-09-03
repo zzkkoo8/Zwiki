@@ -17,4 +17,4 @@
 
 先将文章直接存放在本目录；某一设备类型形成稳定文章集合后，再建立 `server/`、`storage/`、`network-adapter/` 等子目录。
 
-新增文章优先使用[通用技术文章模板](../templates/technical-article.md)或[故障排查模板](../templates/troubleshooting.md)。
+新增文章优先使用[通用技术文章模板](../../templates/technical-article.md)或[故障排查模板](../../templates/troubleshooting.md)。
