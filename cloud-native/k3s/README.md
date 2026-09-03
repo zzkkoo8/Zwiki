@@ -16,4 +16,4 @@
 
 资源对象、调度、Service、Ingress 等通用概念放在 [Kubernetes](../kubernetes/README.md)；只有 K3s 的实现、默认组件或管理方式不同，才放在本目录。
 
-新增文章优先使用[部署指南模板](../templates/deployment-guide.md)或[故障排查模板](../templates/troubleshooting.md)。
+新增文章优先使用[部署指南模板](../../templates/deployment-guide.md)或[故障排查模板](../../templates/troubleshooting.md)。

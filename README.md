@@ -26,15 +26,15 @@ ChatGPT / Codex / 人工维护
 | 分类 | 主要内容 |
 | --- | --- |
 | [基建](infrastructure/README.md) | 硬件、系统、网络、基础服务与通用运维 |
-| [Docker](docker/README.md) | Engine、镜像、容器、Compose、网络、存储与排障 |
-| [Kubernetes](kubernetes/README.md) | 集群、工作负载、网络、存储、安全与故障定位 |
-| [K3s](k3s/README.md) | 安装、节点、运行时、备份恢复、升级与排障 |
-| [开发](development/README.md) | 全栈开发规范、工具平台、前后端开源项目与测试 |
-| [AI](ai/README.md) | Vibe Coding、Skills、插件、模型接入、提示词与 AI 资源 |
-| [Zwiki 使用与维护](wiki-ops/README.md) | 写入前检查、AI 自动审核、错误回退、文章编写规范和模板 |
+| [容器与云原生](cloud-native/README.md) | Docker、Kubernetes、K3s 的部署、运维与排障 |
+| [开发](development/README.md) | 工程平台、前后端技术栈、测试与开发工具 |
+| [AI](ai/README.md) | AI Coding、Vibe Coding、Skills、插件、模型接入、提示词与 AI 资源 |
+| [Zwiki 使用与维护](wiki-ops/README.md) | 日常维护、写入前检查、错误回退、文章规范和模板 |
 
 ## 内容原则
 
+- 一级目录按技术领域组织，二级目录按主题组织，具体文章原则上不超过三级导航。
+- 同一内容只保留一个权威页面，跨分类通过链接引用，不复制维护。
 - 一级目录只在存在实际内容时创建，避免空目录和过度设计。
 - 一篇文章聚焦一个问题，标题直接说明目标或故障现象。
 - 命令应可复制执行，并写明预期输出、判断标准和风险。
@@ -45,6 +45,7 @@ ChatGPT / Codex / 人工维护
 ## 使用与维护
 
 - AI Agent 操作规则见 [`AGENTS.md`](AGENTS.md)。
+- 日常增删改和目录选择见 [Zwiki 日常维护指南](wiki-ops/daily-operations.md)。
 - 修改前执行 [写入前检查](wiki-ops/write-checklist.md)。
 - 文章格式与质量遵循 [文章编写规范](CONTRIBUTING.md)。
 - 写错后按 [错误回退与恢复](wiki-ops/rollback-guide.md) 操作。

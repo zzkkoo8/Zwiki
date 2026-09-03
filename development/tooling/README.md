@@ -1,6 +1,6 @@
-# 前后端开发工具箱
+# 技术栈与工具
 
-本页只收录当前 GitHub 上高热、持续维护、文档成熟，并且能直接提升前端、后端、设计和测试效率的开发项目。筛选日期：`2026-09-03`。
+本页只收录当前 GitHub 上高热、持续维护、文档成熟，并且能直接提升前端、后端、设计和测试效率的开发技术栈与工具。筛选日期：`2026-09-03`。
 
 AI Coding、Skills、插件和模型相关资源统一收录到 [AI](../../ai/README.md) 分类，不在本页重复维护。
 
@@ -45,6 +45,6 @@ Python API      → FastAPI
 真实页面验收    → Playwright
 ```
 
-Agent Skills 和 AI 开发辅助工具见 [Skills 与插件](../../ai/skills-plugins.md)。
+Agent Skills 和 AI 开发辅助工具见 [Skills 与插件](../../ai/skills-plugins.md)，AI 驱动的软件开发方法见 [AI Coding](../../ai/coding/README.md)。
 
 不要为了“工具齐全”把所有项目同时引入一个代码库。先根据项目技术栈选择必要组件，再由测试和验收结果决定是否增加工具。
