@@ -1,4 +1,4 @@
-# FAT32 + exFAT 双分区服务器启动 U 盘（macOS / Windows）
+# 服务器双分区启动 U 盘
 
 用于解决“服务器需 FAT/FAT32 启动，但安装包存在 >4 GB 单文件”的场景：`SYSTEM` 使用 FAT32 启动，`EXFAT_PART` 使用 exFAT 存放大文件。本文以 `safeline-2-software-installer.bin` 为例。
 
