@@ -20,7 +20,7 @@
 ## 开发
 
 * [工程平台](development/platforms/README.md)
-  * [GitHub：Wiki、静态站点与 Web 发布](development/platforms/github-publishing.md)
+  * [GitHub 发布方案](development/platforms/github-publishing.md)
 * [技术栈与工具](development/tooling/README.md)
 
 ## AI
