@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Zwiki 在线文档
+    url: https://zwiki.gitbook.io/zwiki-docs/
+    about: 先确认公开文档中是否已经有相关说明。
