@@ -1,0 +1,96 @@
+name: Sync xmg-qa2 docs
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/sync-xmg-qa2.yml"
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-xmg-qa2-docs
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Zwiki
+        uses: actions/checkout@v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Sync authoritative document
+        id: sync
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          SOURCE_REPO="https://github.com/zzkkoo8/xmg-qa2.git"
+          SOURCE_PATH="docs/design/XMG-QA2-SUPPORT-AGENT-DESIGN.md"
+          TARGET_PATH="projects/xmg-qa2/support-agent-design.md"
+          SOURCE_DIR="${RUNNER_TEMP}/xmg-qa2"
+
+          rm -rf "$SOURCE_DIR"
+          git clone --quiet "$SOURCE_REPO" "$SOURCE_DIR"
+
+          test -s "$SOURCE_DIR/$SOURCE_PATH"
+
+          SOURCE_COMMIT="$(git -C "$SOURCE_DIR" log -1 --format=%H -- "$SOURCE_PATH")"
+          test -n "$SOURCE_COMMIT"
+
+          TMP_FILE="$(mktemp)"
+          {
+            echo "> [!IMPORTANT]"
+            echo "> **自动生成阅读镜像，请勿直接编辑。**"
+            echo ">"
+            echo "> 权威源：<https://github.com/zzkkoo8/xmg-qa2/blob/main/docs/design/XMG-QA2-SUPPORT-AGENT-DESIGN.md>"
+            echo ">"
+            echo "> Source Commit: \`$SOURCE_COMMIT\`"
+            echo
+            cat "$SOURCE_DIR/$SOURCE_PATH"
+          } > "$TMP_FILE"
+
+          if cmp -s "$TMP_FILE" "$TARGET_PATH"; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "source_commit=$SOURCE_COMMIT" >> "$GITHUB_OUTPUT"
+            echo "Mirror is already up to date."
+            rm -f "$TMP_FILE"
+            exit 0
+          fi
+
+          mv "$TMP_FILE" "$TARGET_PATH"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "source_commit=$SOURCE_COMMIT" >> "$GITHUB_OUTPUT"
+
+      - name: Commit mirror update
+        if: steps.sync.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TARGET_PATH="projects/xmg-qa2/support-agent-design.md"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -- "$TARGET_PATH"
+
+          STAGED_FILES="$(git diff --cached --name-only)"
+          if [[ "$STAGED_FILES" != "$TARGET_PATH" ]]; then
+            echo "Unexpected staged files:"
+            printf '%s\n' "$STAGED_FILES"
+            exit 1
+          fi
+
+          git commit -m "sync(xmg-qa2): update support agent design"
+          git pull --rebase origin main
+          git push origin HEAD:main
