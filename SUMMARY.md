@@ -30,10 +30,9 @@
 
 ## Zwiki 使用与维护
 
-* [Zwiki 使用与维护](wiki-ops/README.md)
-  * [写入前检查](wiki-ops/write-checklist.md)
-  * [错误回退与恢复](wiki-ops/rollback-guide.md)
-  * [文章编写规范](CONTRIBUTING.md)
-  * [通用技术文章模板](templates/technical-article.md)
-  * [故障排查模板](templates/troubleshooting.md)
-  * [部署指南模板](templates/deployment-guide.md)
+* [写入前检查](wiki-ops/write-checklist.md)
+* [错误回退与恢复](wiki-ops/rollback-guide.md)
+* [文章编写规范](CONTRIBUTING.md)
+* [通用技术文章模板](templates/technical-article.md)
+* [故障排查模板](templates/troubleshooting.md)
+* [部署指南模板](templates/deployment-guide.md)
