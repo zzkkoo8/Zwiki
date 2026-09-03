@@ -94,6 +94,26 @@ GitHub 仓库：`https://github.com/zzkkoo8/Zwiki`
 6. 只修改 GitHub 中的 Markdown 源文件。
 7. GitHub 更新并通过 AI 自动审核后，自动合并到 `main`，再由 GitBook Git Sync 自动同步发布。
 
+## 外部项目自动镜像
+
+`projects/` 下明确标记为“自动生成阅读镜像”的页面不得直接编辑。
+
+以 xmg-qa2 为例：
+
+- 权威源：`zzkkoo8/xmg-qa2`；
+- 源文件：`docs/design/XMG-QA2-SUPPORT-AGENT-DESIGN.md`；
+- Zwiki 镜像：`projects/xmg-qa2/support-agent-design.md`；
+- 同步 Workflow：`.github/workflows/sync-xmg-qa2.yml`。
+
+当用户要求修改这类镜像页面时：
+
+1. 根据镜像页中的权威源定位原始 GitHub 仓库和源文件。
+2. 修改原始仓库中的源文件，不直接修改 Zwiki 镜像。
+3. 等待同步 Workflow 自动更新 Zwiki；需要立即同步时可手动运行对应 Workflow。
+4. Zwiki `main` 更新后，再由 GitBook Git Sync 发布。
+
+自动镜像 Workflow 是普通 PR 流程的受限例外：仅允许执行确定性的单向文件同步，只能修改预先声明的镜像目标文件，不得借同步任务修改其他 Zwiki 内容。
+
 ## 写入错误处理
 
 如果已经写入错误内容，按照 [`wiki-ops/rollback-guide.md`](wiki-ops/rollback-guide.md) 执行恢复。
