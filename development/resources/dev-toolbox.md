@@ -1,6 +1,8 @@
 # 前后端开发工具箱
 
-本页只收录当前 GitHub 上高热、持续维护、文档成熟，并且能直接提升前端、后端和 AI Coding 效率的项目。筛选日期：`2026-09-03`。
+本页只收录当前 GitHub 上高热、持续维护、文档成熟，并且能直接提升前端、后端、设计和测试效率的开发项目。筛选日期：`2026-09-03`。
+
+AI Coding、Skills、插件和模型相关资源统一收录到 [AI](../../ai/README.md) 分类，不在本页重复维护。
 
 安装与用法只保留最短上手路径；正式用于项目时仍以项目官方 README / 文档为准。
 
@@ -30,16 +32,9 @@
 | --- | --- | --- | --- | --- |
 | Playwright | Microsoft 维护的端到端 Web 测试和浏览器自动化框架，可统一测试 Chromium、Firefox、WebKit。适合把 AI 生成页面的“能打开”提升为真实用户流程验收。 | `npm init playwright@latest` | 运行 `npx playwright test`；优先为登录、新增、编辑、删除等关键用户路径建立 E2E 测试。 | https://github.com/microsoft/playwright |
 
-## AI Coding 与 Skills
-
-| 名字 | 介绍 | 安装 | 用法 | 项目 URL |
-| --- | --- | --- | --- | --- |
-| Superpowers | 面向 Coding Agent 的开发方法与 Skills 集合，覆盖 brainstorming、计划、TDD、系统化调试、代码评审、并行 Agent 和完成前验证。适合让 Codex 等 Agent 从“一次性生成”切换到可审计工程流程。 | Codex CLI 中执行 `/plugins`，搜索 `superpowers`，选择 **Install Plugin**。 | 安装后按任务自动触发相关 Skill；典型流程为设计 → 实施计划 → TDD/实现 → Review → 验证 → 合并。 | https://github.com/obra/superpowers |
-| Vercel Agent Skills | Vercel 官方 Agent Skills 集合，包含 React/Next.js 性能规范、Web 设计与可访问性检查、组件组合模式、Vercel 优化和部署等技能。 | `npx skills add vercel-labs/agent-skills` | 安装后让 Agent 直接执行对应任务，例如：`Review this React component for performance issues` 或 `Review my UI for accessibility and UX issues`。 | https://github.com/vercel-labs/agent-skills |
-
 ## 推荐组合
 
-对于以 AI Coding 为主的常规前后端项目，可先采用这一最小组合：
+对于常规前后端项目，可先采用这一最小组合：
 
 ```text
 设计约束        → awesome-design-md
@@ -48,8 +43,8 @@ React 全栈      → Next.js
 Python API      → FastAPI
 全栈脚手架      → Full Stack FastAPI Template
 真实页面验收    → Playwright
-Agent 工程流程  → Superpowers
-React/设计审计  → Vercel Agent Skills
 ```
+
+Agent Skills 和 AI 开发辅助工具见 [Skills 与插件](../../ai/skills-plugins.md)。
 
 不要为了“工具齐全”把所有项目同时引入一个代码库。先根据项目技术栈选择必要组件，再由测试和验收结果决定是否增加工具。
