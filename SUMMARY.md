@@ -5,7 +5,7 @@
 ## 基建
 
 * [硬件](infrastructure/hardware/README.md)
-  * [macOS 制作 FAT32 + exFAT 双分区服务器启动 U 盘](infrastructure/hardware/bootable-usb-fat32-exfat.md)
+  * [制作 FAT32 + exFAT 双分区服务器启动 U 盘（macOS / Windows）](infrastructure/hardware/bootable-usb-fat32-exfat.md)
 * [系统](infrastructure/system/README.md)
   * [Ubuntu22 内核漏洞安全加固](infrastructure/system/ubuntu22-kernel-security-hardening.md)
 * [网络](infrastructure/network/README.md)
