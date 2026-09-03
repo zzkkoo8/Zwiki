@@ -29,6 +29,7 @@ ChatGPT / Codex / 人工维护
 | [容器与云原生](cloud-native/README.md) | Docker、Kubernetes、K3s 的部署、运维与排障 |
 | [开发](development/README.md) | 工程平台、前后端技术栈、测试与开发工具 |
 | [AI](ai/README.md) | AI Coding、Vibe Coding、Skills、插件、模型接入、提示词与 AI 资源 |
+| [项目](projects/README.md) | 持续维护项目的目标、架构、设计决策与实施文档 |
 | [Zwiki 使用与维护](wiki-ops/README.md) | 日常维护、写入前检查、错误回退、文章规范和模板 |
 
 ## 内容原则
