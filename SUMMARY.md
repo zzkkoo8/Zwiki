@@ -17,7 +17,7 @@
 
 ## 开发
 
-* [开发](development/README.md)
+* [开发概览](development/README.md)
   * [AI 全栈开发规范（FDE）](development/ai-fullstack-workflow.md)
   * [工具平台](development/tools/README.md)
     * [GitHub：Wiki、静态站点与 Web 发布](development/tools/github-publishing.md)
