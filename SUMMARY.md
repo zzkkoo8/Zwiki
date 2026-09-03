@@ -2,12 +2,13 @@
 
 * [知识库首页](README.md)
 
-## 操作系统与基础设施
+## 基建
 
-* [Linux](linux/README.md)
-  * [Ubuntu22 内核漏洞安全加固](linux/ubuntu22-kernel-security-hardening.md)
-* [硬件](hardware/README.md)
-* [网络](network/README.md)
+* [硬件](infrastructure/hardware/README.md)
+* [系统](infrastructure/system/README.md)
+  * [Ubuntu22 内核漏洞安全加固](infrastructure/system/ubuntu22-kernel-security-hardening.md)
+* [网络](infrastructure/network/README.md)
+* [基础服务](infrastructure/services/README.md)
 
 ## 容器与云原生
 
