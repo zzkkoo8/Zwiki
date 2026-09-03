@@ -6,6 +6,7 @@ AI Coding 关注如何用 Coding Agent 完成软件开发工作，包括需求�
 
 - [ChatGPT 与 Codex](chatgpt-codex.md)：ChatGPT 的研究、搜索、Deep Research、Plugin / Skill 用法，以及 Codex 的仓库操作、`AGENTS.md`、Skill、审查和协同开发流程。
 - [Vibe Coding](vibe-coding.md)：把 Coding Agent 纳入完整开发流程，通过分阶段门禁、真实验证和 Git 回退实现稳定交付。
+- [Codex 项目开局规范](codex-project-bootstrap.md)：新项目开工前的 AI 友好技术栈、最小目录结构、必备 Markdown 文件模板，以及 GitHub Flow + Spec Kit 开局基线。
 
 ## 常用 Coding Agent
 
