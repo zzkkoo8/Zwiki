@@ -39,6 +39,7 @@
 
 ## Zwiki 使用与维护
 
+* [日常维护指南](wiki-ops/daily-operations.md)
 * [写入前检查](wiki-ops/write-checklist.md)
 * [错误回退与恢复](wiki-ops/rollback-guide.md)
 * [文章编写规范](CONTRIBUTING.md)
