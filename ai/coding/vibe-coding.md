@@ -1,8 +1,8 @@
-# AI 辅助全栈开发规范：分阶段验收与稳定交付
+# Vibe Coding
 
-本文用于规范使用 Coding Agent 开发前端、后端和 AI 应用的过程。核心目标不是“让 AI 尽快写完代码”，而是让项目**可验证、可回退、可接手、可持续迭代**。
+本文是一份面向实际软件交付的 Vibe Coding 工程规范，用于约束使用 Coding Agent 开发前端、后端和 AI 应用的过程。目标不是“让 AI 尽快写完代码”，而是让 AI 驱动的开发过程**可验证、可回退、可接手、可持续迭代**。
 
-本文基于 FDE 开发规范整理，强化两条执行原则：
+这里的 Vibe Coding 不是“一句话让 AI 生成完整项目”，而是开发者明确目标、边界和验收结果，由 Coding Agent 承担大量实现工作，同时通过工程门禁控制质量。本文参考 FDE 开发规范，强化两条执行原则：
 
 1. **稳定输出前端 + 后端项目**：优先使用主流、AI 熟悉、类型和测试工具完善的技术栈。
 2. **阶段门禁（Gate）**：一个阶段验收通过后，才允许进入下一阶段；当前阶段失败时，只修当前阶段，不提前扩散代码。
@@ -11,7 +11,7 @@
 
 | 字段 | 内容 |
 | --- | --- |
-| 技术领域 | AI Coding / Web 全栈开发 / FDE 工程规范 |
+| 技术领域 | AI Coding / Vibe Coding / Web 全栈开发 |
 | 适用范围 | 新项目、现有项目功能开发、Bug 修复、小规模重构 |
 | 适用版本 | 通用流程，具体框架版本以项目锁文件为准 |
 | 文档状态 | 已验证流程规范 |
@@ -622,11 +622,11 @@ Agent、RAG、MCP、Tool Calling 等能力应放在基础 Web 全栈闭环之后
 
 ## 15. 结论
 
-AI 辅助开发的稳定性，不来自更长的 Prompt，而来自工程控制：
+Vibe Coding 的稳定性，不来自更长的 Prompt，而来自工程控制：
 
 > **固定技术栈 + 小步开发 + 阶段验收 + Git 可回退 + 自动化质量门禁。**
 
-FDE 的目标不是让 AI 一次生成最多代码，而是让每一次生成都处于可理解、可验证、可回退的范围内。
+这套工程规范的目标不是让 AI 一次生成最多代码，而是让每一次生成都处于可理解、可验证、可回退的范围内。
 
 最重要的一条执行规则：
 
@@ -634,8 +634,10 @@ FDE 的目标不是让 AI 一次生成最多代码，而是让每一次生成都
 
 ## 相关文档与资源
 
-- [Zwiki 编写与维护规范](../CONTRIBUTING.md)
-- [通用技术文章模板](../templates/technical-article.md)
+- [AI Coding](README.md)
+- [技术栈与工具](../../development/tooling/README.md)
+- [Zwiki 编写与维护规范](../../CONTRIBUTING.md)
+- [通用技术文章模板](../../templates/technical-article.md)
 - [GitHub .gitignore 模板](https://github.com/github/gitignore)
 - [Conventional Commits](https://www.conventionalcommits.org/)
 - [GitLab CI/CD](https://docs.gitlab.com/ee/ci/)

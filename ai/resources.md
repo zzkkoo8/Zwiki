@@ -15,11 +15,11 @@
 
 ## Zwiki 内部入口
 
-- [AI Coding](ai-coding.md)：Vibe Coding 与 Coding Agent。
+- [AI Coding](coding/README.md)：Vibe Coding 与 Coding Agent。
 - [Skills 与插件](skills-plugins.md)：Skills、插件、MCP。
 - [模型与接入](model-access.md)：API Key / Token 和模型渠道。
 - [提示词](prompting.md)：Prompt 结构和可复用模板。
-- [前后端开发工具箱](../development/resources/dev-toolbox.md)：非 AI 专属的前端、后端、测试和设计工具。
+- [技术栈与工具](../development/tooling/README.md)：非 AI 专属的前端、后端、测试和设计工具。
 
 ## 收录标准
 

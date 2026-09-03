@@ -15,13 +15,18 @@
 
 ## 内容分类边界
 
-新增或迁移文章时优先保持 GitHub 物理目录和 GitBook 导航语义一致：
+新增或迁移文章时优先保持 GitHub 物理目录和 GitBook 导航语义一致。一级按领域、二级按主题、三级放具体文章；原则上不要增加第四级导航。
 
 - `infrastructure/`：基建，包括硬件、系统、网络、基础服务。
-- `docker/`、`kubernetes/`、`k3s/`：容器与云原生。
-- `development/`：软件开发与交付，包括前端、后端、测试、工程规范、开发/发布平台；FDE 继续放这里。
-- `ai/`：AI 专属内容，包括 Vibe Coding、Coding Agent、模型接入、API Key / Token 获取与安全配置、Skills、插件、MCP、提示词和 AI 资源。
+- `cloud-native/`：容器与云原生，包括 Docker、Kubernetes、K3s。
+- `development/platforms/`：工程平台，包括 GitHub、GitBook、GitLab、Vercel、CI/CD 等开发协作与发布平台。
+- `development/tooling/`：技术栈与工具，包括前端、后端、全栈、设计和测试工具。
+- `ai/coding/`：AI Coding，包括 Vibe Coding、Codex、Claude Code、Cursor、多 Agent 协作、上下文管理和 AI 代码审查。
+- `ai/`：其他 AI 专属内容，包括模型接入、API Key / Token 获取与安全配置、Skills、插件、MCP、提示词和 AI 资源。
 - `projects/`：项目阅读页或外部项目自动镜像。
+- `wiki-ops/`：Zwiki 自身的维护、写入、回退和同步操作说明。
+
+分类入口 `README.md` 可以作为 GitHub 目录说明存在，但如果只是导航概览，不必重复出现在 GitBook 左侧目录。所谓“概览页”不得把有实际价值的文章压成额外一层。
 
 同一内容只能有一个权威页面。跨分类需要引用时使用 Markdown 链接，不复制同一份说明到多个目录。
 

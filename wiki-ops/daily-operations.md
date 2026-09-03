@@ -14,13 +14,12 @@ Zwiki 的唯一事实源是 GitHub `main`。正常维护只修改 GitHub Markdow
 | 基建 / 系统 | `infrastructure/system/` | Linux、Ubuntu、内核、systemd、存储、权限、软件包、安全加固和系统故障 |
 | 基建 / 网络 | `infrastructure/network/` | TCP/IP、路由交换、VLAN、DNS 协议、TLS、代理、抓包、链路与网络故障 |
 | 基建 / 基础服务 | `infrastructure/services/` | DNS 服务、NTP/Chrony、OpenSSH、Nginx、HAProxy、Keepalived、NFS、Samba、rsync 等通用服务 |
-| 容器与云原生 / Docker | `docker/` | Docker Engine、镜像、容器、Compose、网络、存储和 Docker 部署排障 |
-| 容器与云原生 / Kubernetes | `kubernetes/` | Kubernetes 集群、工作负载、网络、存储、安全、调度与排障 |
-| 容器与云原生 / K3s | `k3s/` | K3s 安装、节点、运行时、升级、备份恢复和故障排查 |
-| 开发 | `development/` | 软件工程、前后端开发、测试、代码质量、开发/发布平台和完整项目交付流程 |
-| 开发 / 工具平台 | `development/tools/` | GitHub、GitBook、Vercel、CI/CD 等开发与发布平台 |
-| 开发 / 开发资源 | `development/resources/` | 前端、后端、测试、设计等可直接用于软件开发的开源项目和工具 |
-| AI / AI Coding | `ai/ai-coding.md` 或后续同主题页面 | Vibe Coding、Codex、Claude Code、Cursor、Coding Agent、上下文管理和 AI 开发方法 |
+| 容器与云原生 / Docker | `cloud-native/docker/` | Docker Engine、镜像、容器、Compose、网络、存储和 Docker 部署排障 |
+| 容器与云原生 / Kubernetes | `cloud-native/kubernetes/` | Kubernetes 集群、工作负载、网络、存储、安全、调度与排障 |
+| 容器与云原生 / K3s | `cloud-native/k3s/` | K3s 安装、节点、运行时、升级、备份恢复和故障排查 |
+| 开发 / 工程平台 | `development/platforms/` | GitHub、GitBook、GitLab、Vercel、CI/CD 等开发协作与发布平台 |
+| 开发 / 技术栈与工具 | `development/tooling/` | 前端、后端、全栈、测试、设计等非 AI 专属技术栈与开发工具 |
+| AI / AI Coding | `ai/coding/` | Vibe Coding、Codex、Claude Code、Cursor、Coding Agent、上下文管理、多 Agent 和 AI 代码审查 |
 | AI / Skills 与插件 | `ai/skills-plugins.md` 或后续同主题页面 | Agent Skills、插件、MCP、Superpowers 等 AI 能力扩展 |
 | AI / 模型与接入 | `ai/model-access.md` 或后续同主题页面 | 模型选择、OpenAI/Anthropic/OpenRouter、API Key/Token 的合法申请与配置、模型渠道切换 |
 | AI / 提示词 | `ai/prompting.md` 或后续同主题页面 | Prompt Engineering、系统提示词、开发提示词、审计提示词和提示词模板 |
@@ -32,11 +31,22 @@ Zwiki 的唯一事实源是 GitHub `main`。正常维护只修改 GitHub Markdow
 ### 分类判断原则
 
 1. **系统本身的问题**放“基建 / 系统”；运行在系统之上的通用服务放“基建 / 基础服务”。
-2. Docker、Kubernetes、K3s 不放“基础服务”，继续放“容器与云原生”。
-3. 前后端框架、测试、交付流程放“开发”；Coding Agent、Prompt、模型、Skills、MCP 放“AI”。
-4. FDE 这类“使用 AI 完成完整软件工程交付”的规范仍放“开发”，因为主问题是软件工程交付。
-5. 同一主题已有文章时优先修改存量文章，不重复新建。
-6. 不确定分类时，不需要自己猜，让 AI 先审计现有目录和相关文章后决定。
+2. Docker、Kubernetes、K3s 统一放 `cloud-native/`，不与“基础服务”混用。
+3. GitHub、GitBook、CI/CD 等平台放“开发 / 工程平台”；前后端框架、测试和设计工具放“开发 / 技术栈与工具”。
+4. Coding Agent、Vibe Coding、Prompt、模型、Skills、插件和 MCP 放“AI”；其中 Vibe Coding 归“AI / AI Coding”。
+5. 具体项目自己的架构和设计文档放“项目”，即使项目本身属于 AI 产品，也不要混入通用 AI 知识。
+6. 同一主题已有文章时优先修改存量文章，不重复新建。
+7. 不确定分类时，不需要自己猜，让 AI 先审计现有目录和相关文章后决定。
+
+### 导航层级原则
+
+```text
+一级：领域
+二级：主题
+三级：具体文章
+```
+
+原则上不建立第四级 GitBook 导航。仅用于说明目录职责的 `README.md` 可以保留在 GitHub，但如果没有独立阅读价值，不必重复显示在 GitBook 左侧目录。
 
 ## 2. 最推荐的提示词写法
 

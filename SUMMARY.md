@@ -12,21 +12,20 @@
 
 ## 容器与云原生
 
-* [Docker](docker/README.md)
-* [Kubernetes](kubernetes/README.md)
-* [K3s](k3s/README.md)
+* [Docker](cloud-native/docker/README.md)
+* [Kubernetes](cloud-native/kubernetes/README.md)
+* [K3s](cloud-native/k3s/README.md)
 
 ## 开发
 
-* [开发概览](development/README.md)
-* [AI 全栈开发规范（FDE）](development/ai-fullstack-workflow.md)
-* [工具平台](development/tools/README.md)
-  * [GitHub：Wiki、静态站点与 Web 发布](development/tools/github-publishing.md)
-* [开发资源](development/resources/dev-toolbox.md)
+* [工程平台](development/platforms/README.md)
+  * [GitHub：Wiki、静态站点与 Web 发布](development/platforms/github-publishing.md)
+* [技术栈与工具](development/tooling/README.md)
 
 ## AI
 
-* [AI Coding](ai/ai-coding.md)
+* [AI Coding](ai/coding/README.md)
+  * [Vibe Coding](ai/coding/vibe-coding.md)
 * [Skills 与插件](ai/skills-plugins.md)
 * [模型与接入](ai/model-access.md)
 * [提示词](ai/prompting.md)

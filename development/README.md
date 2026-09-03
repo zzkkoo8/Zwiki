@@ -1,20 +1,18 @@
 # 开发
 
-本分类统一收纳软件开发与交付相关内容：前端、后端、测试、工程规范、开发平台和发布流程。
+本分类收纳非 AI 专属的软件开发与交付内容：工程平台、前端、后端、测试、技术栈和开发工具。
 
-AI 工具、模型、Vibe Coding、Skills、插件、MCP 和提示词统一放到 [AI](../ai/README.md) 分类，避免两边重复维护。
+AI Coding、Vibe Coding、Coding Agent、Skills、插件、MCP、模型和提示词统一放到 [AI](../ai/README.md) 分类，避免“开发”和“AI”重复维护同一主题。
 
 ## 内容入口
 
-- [AI 全栈开发规范（FDE）](ai-fullstack-workflow.md)：Coding Agent 参与前后端开发时的工程流程、阶段门禁、测试与交付规范。
-- [工具平台](tools/README.md)：GitHub、GitBook、Vercel、CI/CD 等开发与发布平台。
-- [开发资源](resources/dev-toolbox.md)：精选设计、前端、后端、全栈和测试开源项目。
+- [工程平台](platforms/README.md)：GitHub、GitBook、Vercel、GitLab、CI/CD 等开发、协作和发布平台。
+- [技术栈与工具](tooling/README.md)：前端、后端、全栈、设计和测试领域的主流技术栈与工具。
 
 ## 收录原则
 
-- 软件开发方法、工程规范和项目交付流程放在 `development/`。
-- 具体开发与发布平台放在 `development/tools/`。
-- 前端、后端、测试等工程资源放在 `development/resources/`。
-- AI 专属能力统一放在 `ai/`；开发文章需要引用 AI 工具时使用链接，不复制同一份资源说明。
-- 优先收录社区主流、持续维护、文档成熟且能直接提升工程效率的项目。
-- 同一主题只保留少量主流选择，避免把 Zwiki 变成无筛选的链接大全。
+- 开发平台、代码托管、CI/CD、文档和 Web 发布平台放在 `development/platforms/`。
+- 前端、后端、全栈、测试和设计工具放在 `development/tooling/`。
+- Vibe Coding、Codex、Claude Code、Cursor 等 Coding Agent 方法和工具放在 `ai/coding/`。
+- 同一主题只能有一个权威页面；跨分类内容使用链接引用，不复制说明。
+- 优先收录社区主流、持续维护、文档成熟且能直接提升工程效率的内容。

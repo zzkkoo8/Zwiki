@@ -17,4 +17,4 @@
 
 先将文章直接存放在本目录；形成稳定集合后，再按 `engine/`、`compose/`、`networking/`、`storage/` 或 `troubleshooting/` 拆分。
 
-新增文章优先使用[部署指南模板](../templates/deployment-guide.md)或[故障排查模板](../templates/troubleshooting.md)。
+新增文章优先使用[部署指南模板](../../templates/deployment-guide.md)或[故障排查模板](../../templates/troubleshooting.md)。

@@ -17,4 +17,4 @@
 
 Kubernetes 通用机制放在本目录；K3s 安装方式、内置组件、服务管理、数据目录和发行版特有问题放在 [K3s](../k3s/README.md)。
 
-新增文章优先使用[通用技术文章模板](../templates/technical-article.md)或[故障排查模板](../templates/troubleshooting.md)。
+新增文章优先使用[通用技术文章模板](../../templates/technical-article.md)或[故障排查模板](../../templates/troubleshooting.md)。
