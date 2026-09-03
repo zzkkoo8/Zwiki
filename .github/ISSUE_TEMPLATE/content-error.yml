@@ -1,0 +1,32 @@
+name: 文档纠错
+description: 报告 Zwiki 页面中的错误、失效链接或需要补充的内容
+title: "[文档纠错] "
+labels: []
+body:
+  - type: input
+    id: page
+    attributes:
+      label: Zwiki 页面链接
+      description: 请粘贴发现问题的 GitBook 页面地址。
+      placeholder: https://zwiki.gitbook.io/zwiki-docs/...
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: 问题描述
+      description: 请说明错误位置、现象和依据；命令类问题尽量附上版本与报错。
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: 建议修改
+      description: 可选。知道正确内容时可直接给出建议，或提交 Pull Request。
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 我已确认该问题仍存在于当前公开页面。
+          required: true
