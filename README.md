@@ -29,7 +29,8 @@ ChatGPT / Codex / 人工维护
 | [Docker](docker/README.md) | Engine、镜像、容器、Compose、网络、存储与排障 |
 | [Kubernetes](kubernetes/README.md) | 集群、工作负载、网络、存储、安全与故障定位 |
 | [K3s](k3s/README.md) | 安装、节点、运行时、备份恢复、升级与排障 |
-| [开发](development/README.md) | AI 全栈开发规范、工具平台、开源项目、插件与 Skills |
+| [开发](development/README.md) | 全栈开发规范、工具平台、前后端开源项目与测试 |
+| [AI](ai/README.md) | Vibe Coding、Skills、插件、模型接入、提示词与 AI 资源 |
 | [Zwiki 使用与维护](wiki-ops/README.md) | 写入前检查、AI 自动审核、错误回退、文章编写规范和模板 |
 
 ## 内容原则
