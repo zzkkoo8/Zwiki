@@ -24,6 +24,14 @@
   * [GitHub：Wiki、静态站点与 Web 发布](development/tools/github-publishing.md)
 * [开发资源](development/resources/dev-toolbox.md)
 
+## AI
+
+* [AI Coding](ai/ai-coding.md)
+* [Skills 与插件](ai/skills-plugins.md)
+* [模型与接入](ai/model-access.md)
+* [提示词](ai/prompting.md)
+* [AI 资源](ai/resources.md)
+
 ## 项目
 
 * [xmg-qa2](projects/xmg-qa2/README.md)
