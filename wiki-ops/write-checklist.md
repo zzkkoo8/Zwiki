@@ -2,6 +2,8 @@
 
 本流程适用于人工、ChatGPT、Codex 或其他 AI Agent 对 Zwiki 的新增和修改操作。
 
+不知道文章应该放到哪个目录，或需要直接复制可用的增删改提示词时，先看[《Zwiki 日常维护指南》](daily-operations.md)。
+
 Zwiki 默认由 AI 完成写入、自动审核和发布，不要求用户手工审核 Pull Request。Pull Request 主要用于保留差异和审计记录。
 
 ## 1. 确认事实源
@@ -73,7 +75,7 @@ https://zwiki.gitbook.io/zwiki-docs/...
 附件应与文章一起进入 GitHub 版本控制。推荐结构：
 
 ```text
-linux/
+infrastructure/system/
 ├── ubuntu22-kernel-security-hardening.md
 └── assets/
     └── ubuntu22-kernel-security-hardening/
