@@ -16,11 +16,9 @@
 | 分区方案 | MBR + FAT32 `SYSTEM` + exFAT `EXFAT_PART` |
 | 文档状态 | 实操方案，目标服务器仍需按机型验证启动兼容性 |
 | 最后验证 | 2026-09-03 |
-| 来源 | 现场操作方案、UEFI Specification、Microsoft DiskPart 文档 |
+| 来源 | 现场操作方案、UEFI Specification、Microsoft DiskPart / Windows Insider 文档 |
 
 ## 1. 方案结构
-
-逻辑结构：
 
 ```text
 U 盘
@@ -63,29 +61,35 @@ exFAT：负责存放 >4 GB 安装文件
 
 如果目标服务器厂商明确要求 GPT/UEFI，应按设备要求改用 GPT，并重新验证启动行为，不应机械套用本文的 MBR 参数。
 
-### 2.4 macOS 和 Windows 分区大小为什么不同
+### 2.4 分区大小如何选择
 
-macOS 示例沿用现场验证方案：
+macOS 示例沿用现场方案：
 
 ```text
 SYSTEM      60%
 EXFAT_PART  剩余空间
 ```
 
-Windows 内置格式化工具对新建 FAT32 大卷存在约 32 GB 的格式化限制，因此 Windows 示例将 `SYSTEM` 控制在约 30 GB：
+Windows 示例为了兼容不同 Windows 10/11 版本以及不同格式化工具行为，默认使用：
 
 ```text
 SYSTEM      30000 MB
 EXFAT_PART  剩余空间
 ```
 
-只要 `SYSTEM` 足够容纳除大 `.bin` 文件外的启动介质内容即可，不要求两个平台使用完全相同的容量比例。
+这里的 `30000 MB` 不是 FAT32 文件系统自身的容量上限，而是兼容性较好的保守值。较老 Windows 内置工具通常不允许创建超过约 32 GB 的新 FAT32 卷；Microsoft 已在较新的 Windows 11 命令行格式化功能中将 FAT32 格式化上限逐步提升到 2 TB，但具体能力取决于当前 Windows 版本和更新通道。
+
+因此生产操作建议：
+
+1. `SYSTEM` 只要能容纳除大 `.bin` 外的启动文件即可。
+2. 30 GB 足够时，优先使用 30000 MB，兼容性最好。
+3. 确实需要更大的 FAT32 `SYSTEM` 时，应先在当前 Windows 版本实测格式化能力，或直接使用 macOS 方案。
 
 ---
 
-# 3. macOS 制作方法
+## 3. macOS 制作方法
 
-## 3.1 确认 U 盘设备
+### 3.1 确认 U 盘设备
 
 查看磁盘：
 
@@ -113,7 +117,7 @@ diskutil info /dev/disk2 | egrep 'Device / Media Name|Disk Size|Protocol|Interna
 
 > **高风险操作：** 后面的 `partitionDisk` 和 `eraseDisk` 会清空整个目标磁盘。U 盘重新插拔后 `/dev/diskN` 编号可能变化，每次都必须重新确认。
 
-## 3.2 创建 FAT32 + exFAT 双分区
+### 3.2 创建 FAT32 + exFAT 双分区
 
 确认目标 U 盘确实为 `/dev/disk2` 后执行：
 
@@ -143,7 +147,7 @@ SYSTEM
 EXFAT_PART
 ```
 
-## 3.3 复制安装文件
+### 3.3 复制安装文件
 
 将除以下两个文件外的全部安装介质文件复制到 `SYSTEM`：
 
@@ -174,15 +178,15 @@ diskutil eject /dev/disk2
 
 ---
 
-# 4. Windows 制作方法
+## 4. Windows 制作方法
 
 推荐使用 Windows 自带的 **PowerShell + DiskPart**，无需安装第三方分区软件。
 
 > `clean` 会立即删除所选磁盘现有分区。以下示例中的 `Disk 2` 只是示例，必须根据实际 U 盘重新确认。
 
-## 4.1 确认 U 盘编号
+### 4.1 确认 U 盘编号
 
-以管理员身份打开 PowerShell，执行：
+以管理员身份打开 PowerShell：
 
 ```powershell
 Get-Disk | Sort-Object Number | Format-Table Number,FriendlyName,BusType,PartitionStyle,@{N='SizeGB';E={[math]::Round($_.Size/1GB,1)}}
@@ -194,7 +198,7 @@ Get-Disk | Sort-Object Number | Format-Table Number,FriendlyName,BusType,Partiti
 - 容量与 U 盘一致。
 - `FriendlyName` 与 U 盘型号基本一致。
 
-也可以进入 DiskPart 再次确认：
+进入 DiskPart 再次确认：
 
 ```text
 diskpart
@@ -205,11 +209,11 @@ detail disk
 
 只有在 `detail disk` 显示的设备确实为目标 U 盘时才继续。
 
-## 4.2 使用 DiskPart 创建双分区
+### 4.2 使用 DiskPart 创建双分区
 
-以下示例假设 U 盘为 `Disk 2`，`SYSTEM` 分区设置为 30000 MB。
+以下示例假设 U 盘为 `Disk 2`，`SYSTEM` 设置为 30000 MB。
 
-以管理员身份打开 CMD 或 PowerShell：
+管理员 CMD 或 PowerShell 中运行：
 
 ```text
 diskpart
@@ -235,7 +239,7 @@ list volume
 exit
 ```
 
-完成后的预期结构：
+预期结构：
 
 ```text
 S:  FAT32  SYSTEM       约 30 GB
@@ -247,12 +251,10 @@ E:  exFAT  EXFAT_PART   剩余空间
 - `clean`：删除 U 盘现有分区信息。
 - `convert mbr`：使用 MBR 分区表。
 - `size=30000`：创建约 30 GB 的 FAT32 启动分区。
-- `active`：为 Legacy BIOS/MBR 启动提供活动分区标记；纯 UEFI 环境通常不依赖此标记。如果该命令在特定可移动介质上报错，可先跳过并按服务器实际启动方式验证。
+- `active`：为 Legacy BIOS/MBR 启动提供活动分区标记；纯 UEFI 环境通常不依赖该标记。如果该命令在某些可移动介质上报错，可先跳过并按服务器实际启动方式验证。
 - 第二个 `create partition primary` 未指定大小，因此使用全部剩余空间。
 
-> Windows 原生 FAT32 格式化通常不适合创建超过约 32 GB 的新 FAT32 卷。如果除 `.bin` 外的启动文件仍然超过约 30 GB，优先使用本文 macOS 方法，或重新评估安装介质拆分方式，不建议为了方便随意使用来源不明的分区工具。
-
-## 4.3 图形界面验证
+### 4.3 图形界面验证
 
 按：
 
@@ -273,14 +275,14 @@ EXFAT_PART  exFAT
 Get-Volume | Where-Object FileSystemLabel -in 'SYSTEM','EXFAT_PART' | Format-Table DriveLetter,FileSystemLabel,FileSystem,Size,SizeRemaining
 ```
 
-## 4.4 复制安装文件
+### 4.4 复制安装文件
 
 最简单的方法是在资源管理器中复制：
 
 - `S:\`：放除 `.bin` 和 `.password` 外的所有文件。
 - `E:\`：放 `.bin` 和 `.password`。
 
-如果原安装介质已经解压到 `C:\install-media`，也可以使用命令：
+如果原安装介质已经解压到 `C:\install-media`，也可以使用：
 
 ```cmd
 robocopy C:\install-media S:\ /E /XF safeline-2-software-installer.bin safeline-2-software-installer.bin.password
@@ -294,9 +296,9 @@ copy /Y C:\install-media\safeline-2-software-installer.bin.password E:\
 Get-Item E:\safeline-2-software-installer.bin,E:\safeline-2-software-installer.bin.password | Format-Table Name,Length
 ```
 
-## 4.5 生成 Linux 可直接校验的 SHA256 文件
+### 4.5 生成 Linux 可直接校验的 SHA256 文件
 
-在 PowerShell 执行：
+PowerShell 执行：
 
 ```powershell
 $File='E:\safeline-2-software-installer.bin'
@@ -304,7 +306,7 @@ $Hash=(Get-FileHash $File -Algorithm SHA256).Hash.ToLower()
 "$Hash  safeline-2-software-installer.bin" | Set-Content -Encoding ascii S:\safeline-2-software-installer.bin.sha256
 ```
 
-这样服务器启动后可以直接使用：
+服务器启动后可直接使用：
 
 ```bash
 sha256sum -c /media/sdc1/safeline-2-software-installer.bin.sha256
@@ -314,11 +316,11 @@ sha256sum -c /media/sdc1/safeline-2-software-installer.bin.sha256
 
 ---
 
-# 5. 服务器启动后的公共操作
+## 5. 服务器启动后的公共操作
 
 无论 U 盘由 macOS 还是 Windows 制作，服务器端步骤相同。
 
-## 5.1 识别 U 盘和两个分区
+### 5.1 识别 U 盘和两个分区
 
 进入 Linux 安装环境后，不要默认 U 盘一定是 `/dev/sdc`。
 
@@ -346,14 +348,14 @@ blkid
 
 实际设备名不同时，后续命令必须同步替换。
 
-单独确认：
+确认文件系统：
 
 ```bash
 blkid /dev/sdc1
 blkid /dev/sdc2
 ```
 
-## 5.2 挂载两个分区
+### 5.2 挂载两个分区
 
 先检查是否已经自动挂载：
 
@@ -386,7 +388,7 @@ findmnt /media/sdc2
 df -hT | grep -E '/media/sdc[12]'
 ```
 
-## 5.3 exFAT 挂载失败
+### 5.3 exFAT 挂载失败
 
 如果出现：
 
@@ -403,9 +405,7 @@ mount -t exfat /dev/sdc2 /media/sdc2
 
 如果仍失败，说明当前安装环境缺少可用的 exFAT 支持。此时不要格式化分区或继续安装，应更换支持 exFAT 的安装环境，或重新设计第二分区文件系统。
 
-## 5.4 校验大文件
-
-检查文件：
+### 5.4 校验大文件
 
 ```bash
 ls -lh /media/sdc2/safeline-2-software-installer.bin*
@@ -426,9 +426,7 @@ safeline-2-software-installer.bin: OK
 
 校验失败时不要继续安装，应重新复制安装包。
 
-## 5.5 确认 install.sh 支持 BIN_MOUNT_POINT
-
-不同版本安装脚本可能不同，先检查：
+### 5.5 确认 install.sh 支持 BIN_MOUNT_POINT
 
 ```bash
 cd /media/sdc1
@@ -439,9 +437,7 @@ grep -n 'BIN_MOUNT_POINT' ./install.sh
 
 无匹配结果：当前脚本版本可能不支持通过环境变量指定安装包目录，不应直接继续。
 
-## 5.6 确认系统安装目标盘
-
-再次检查所有磁盘：
+### 5.6 确认系统安装目标盘
 
 ```bash
 lsblk -o NAME,TRAN,SIZE,TYPE,FSTYPE,MOUNTPOINTS,MODEL
@@ -456,17 +452,10 @@ sdc = 启动 U 盘
 
 必须根据实际容量和型号确认，不要仅根据盘符猜测。
 
-## 5.7 执行安装
-
-进入 FAT32 启动分区：
+### 5.7 执行安装
 
 ```bash
 cd /media/sdc1
-```
-
-推荐直接在同一条命令中传递变量：
-
-```bash
 BIN_MOUNT_POINT=/media/sdc2 ./install.sh sda
 ```
 
@@ -490,9 +479,9 @@ BIN_MOUNT_POINT=/media/sdc2
 
 ---
 
-# 6. 常见问题
+## 6. 常见问题
 
-## 6.1 可以从 SYSTEM 启动，但服务器看不到 EXFAT_PART
+### 6.1 可以从 SYSTEM 启动，但服务器看不到 EXFAT_PART
 
 执行：
 
@@ -505,7 +494,7 @@ blkid
 
 如果第二分区存在但不能挂载，重点检查 exFAT 驱动支持。
 
-## 6.2 服务器完全无法从 U 盘启动
+### 6.2 服务器完全无法从 U 盘启动
 
 依次确认：
 
@@ -514,11 +503,9 @@ blkid
 3. `SYSTEM` 是否为第一个 FAT32 分区。
 4. 启动文件是否完整复制到 `SYSTEM` 根目录结构中。
 5. 服务器是否明确要求 GPT 或特定启动模式。
-6. Windows 制作时可尝试确认 MBR `SYSTEM` 分区已设置 `active`，但纯 UEFI 机器不依赖该标记。
+6. Windows 制作时可确认 MBR `SYSTEM` 分区是否已设置 `active`；纯 UEFI 机器通常不依赖该标记。
 
-## 6.3 install.sh 找不到 .bin
-
-执行：
+### 6.3 install.sh 找不到 .bin
 
 ```bash
 ls -lh /media/sdc2/safeline-2-software-installer.bin
@@ -533,22 +520,25 @@ grep -n 'BIN_MOUNT_POINT' /media/sdc1/install.sh
 - 当前安装脚本支持 `BIN_MOUNT_POINT`。
 - 环境变量使用同行赋值或 `export` 传给脚本。
 
-## 6.4 Windows 的 `format fs=fat32` 报卷太大
+### 6.4 Windows 的 FAT32 格式化报卷太大
 
-Windows 原生工具对创建大型 FAT32 卷有限制。
+Windows 版本和格式化入口存在差异：
 
-优先处理方式：
+- 较老 Windows 版本和部分 GUI/命令行工具仍可能限制新建 FAT32 卷大小。
+- Microsoft 已在较新的 Windows 11 命令行格式化功能中逐步把 FAT32 格式化上限提升到 2 TB。
 
-1. 把 `SYSTEM` 缩小到 30 GB 左右。
-2. 确认除 `.bin` 外的启动文件可以放入 `SYSTEM`。
-3. 剩余全部空间给 exFAT。
-4. 如果 `SYSTEM` 确实必须超过约 32 GB，优先改用 macOS 制作方案。
+遇到报错时优先：
 
-不要把 FAT32 和 exFAT 的职责颠倒，否则可能造成服务器无法启动。
+1. 使用本文的 `SYSTEM=30000 MB` 兼容方案。
+2. 确认除 `.bin` 外的启动文件能放入 `SYSTEM`。
+3. 剩余空间全部给 exFAT。
+4. 如果 `SYSTEM` 必须更大，可在当前 Windows 版本验证新的命令行 `format` 能力，或使用 macOS 方案。
+
+不要把 FAT32 与 exFAT 的职责颠倒，否则可能造成服务器无法启动。
 
 ---
 
-# 7. 备选方案：两个 U 盘
+## 7. 备选方案：两个 U 盘
 
 如果目标服务器或安装环境对单 U 盘双分区兼容性不好，可以使用两个 U 盘：
 
@@ -565,9 +555,9 @@ U 盘 2：exFAT，仅存放 .bin 和 .password
 
 ---
 
-# 8. 恢复 U 盘为普通单分区
+## 8. 恢复 U 盘为普通单分区
 
-## 8.1 macOS
+### 8.1 macOS
 
 重新确认 U 盘编号：
 
@@ -589,7 +579,7 @@ diskutil list /dev/disk2
 
 > `eraseDisk` 会删除整个 U 盘上的全部分区和文件。
 
-## 8.2 Windows
+### 8.2 Windows
 
 管理员终端执行：
 
@@ -606,17 +596,19 @@ assign
 exit
 ```
 
-对于大于 32 GB 的普通 U 盘，恢复为 exFAT 通常最省事。
+恢复为普通数据 U 盘时，exFAT 对大容量设备最省事。
 
-如果 U 盘不超过约 32 GB，并明确需要 FAT32，可将格式化命令改为：
+如果明确需要 FAT32，可根据当前 Windows 版本和 U 盘容量尝试：
 
 ```text
 format fs=fat32 quick label=CT
 ```
 
+如果提示卷太大，则缩小 FAT32 分区、使用支持大 FAT32 格式化的当前 Windows 命令行能力，或在 macOS 上恢复。
+
 ---
 
-# 9. 最短操作流程
+## 9. 最短操作流程
 
 ```text
 macOS
@@ -629,7 +621,7 @@ Windows
   ↓
   clean + convert mbr
   ↓
-  FAT32 SYSTEM（约 30 GB）+ exFAT EXFAT_PART
+  FAT32 SYSTEM（兼容示例约 30 GB）+ exFAT EXFAT_PART
 
 共同步骤
   ↓
@@ -658,3 +650,4 @@ BIN_MOUNT_POINT=/media/sdc2 ./install.sh sda
 - Microsoft DiskPart：<https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/diskpart>
 - Microsoft `create partition primary`：<https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/create-partition-primary>
 - Microsoft `format`：<https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/format>
+- Windows 11 FAT32 命令行格式化上限调整（Windows Insider）：<https://blogs.windows.com/windows-insider/2026/04/10/announcing-windows-11-insider-preview-build-26220-8165-beta-channel/>
