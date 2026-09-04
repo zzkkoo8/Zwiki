@@ -1,597 +1,224 @@
 # Ubuntu22 内核漏洞安全加固
 
-本文用于 Ubuntu 22.04 LTS（Jammy）服务器的内核漏洞修复。目标是**只升级 GA 5.15 内核及其必要依赖**，不执行整机 `apt upgrade`，并在升级前完成包管理、启动分区、回退能力等硬性检查。
+本文用于 Ubuntu 22.04 LTS（Jammy）内核漏洞修复，重点覆盖两类场景：
+
+1. **标准 Ubuntu 22.04 Server**：按 GA 5.15 内核轨道正常升级；
+2. **产品定制 Ubuntu 22.04**：EFI/VFAT 分区被直接挂载到 `/boot`，导致 Ubuntu 原生 `linux-image` 安装失败。
+
+本文特殊场景方案已经在谛听硬件版实机完成安装、真实重启和产品业务验收，不再以推测方案作为主流程。
 
 ## 文档信息
 
 | 字段 | 内容 |
 | --- | --- |
 | 技术领域 | Linux / Ubuntu / Kernel / 安全加固 |
-| 适用范围 | Ubuntu 22.04 LTS Server，amd64，GA 5.15 内核 |
-| 适用版本 | Ubuntu 22.04.x LTS（Jammy） |
-| 文档状态 | 已验证（标准流程 + 产品定制系统特殊场景实测） |
-| 最后验证 | 2026-09-02 |
-| 修复目标 | CVE-2026-43284、CVE-2026-46300 |
-| Canonical GA 修复基线 | `linux` package version `>= 5.15.0-181.191` |
-| 来源 | Canonical / Ubuntu 官方资料 + 实机测试记录 |
+| 适用范围 | Ubuntu 22.04 LTS，amd64，Jammy GA 5.15 |
+| 重点漏洞 | CVE-2026-43284、CVE-2026-46300 |
+| Canonical Jammy GA 修复下限 | `5.15.0-181.191` |
+| 特殊场景验证 | 谛听硬件版 / Advantech FWA-3270 |
+| 修复前 | `5.15.0-72-generic`，package `5.15.0-72.79` |
+| 实测修复后 | `5.15.0-191-generic`，package `5.15.0-191.201` |
+| 最后验证 | 2026-09-04 |
+| 文档状态 | 已实机验证 |
 
-## 1. 结论
+# 1. 结论
 
-Ubuntu 22.04 Server 默认 GA 内核轨道为 5.15。本次漏洞无需为了安全修复主动切换 HWE 6.8；继续升级 GA 5.15 即可。
+Ubuntu 22.04 Server 默认 GA 内核轨道为 5.15。针对本文两个 CVE，不需要为了修复漏洞主动切换 HWE 6.8；Jammy GA 5.15 只要运行 Canonical 已 backport 修复的版本即可。
 
-Canonical 对 Ubuntu 22.04 Jammy 的两个漏洞均给出 GA 修复基线：
+本次两个 CVE 的 Jammy GA 修复下限均为：
 
 ```text
 5.15.0-181.191
 ```
 
-当前仓库 Candidate 应以目标主机执行以下命令得到的结果为准，不要把文档中的示例版本写死为长期目标：
+处理方式按系统形态区分：
 
-```bash
-apt-cache policy linux-generic
-```
+| 场景 | 推荐方案 |
+| --- | --- |
+| 标准 Ubuntu，`/boot` 位于 ext4/xfs 等 Linux 文件系统 | 使用 `linux-generic` 正常升级 |
+| 厂商提供自己的 kernel/固件升级包 | 优先使用厂商正式升级链 |
+| 产品把 VFAT/FAT 直接挂载到 `/boot` | **禁止直接在 VFAT `/boot` 上安装内核，按第 6 章已验证特殊流程处理** |
+| 暂时无法正式升级且业务不使用 IPsec/XFRM、AFS/RxRPC | 可临时屏蔽 `esp4`、`esp6`、`rxrpc`，但不能替代正式修复 |
 
-如果目标仅是升级内核，不希望把系统中其他可升级软件一起更新，推荐流程是：
+> `uname -r` 只代表当前正在运行的 kernel。安装新 kernel 后，必须真实 reboot 并完成业务验收，才能认定修复生效。
 
-```bash
-sudo apt-get update
-apt-cache policy linux-generic
-sudo apt-get -s install linux-generic
-sudo apt-get install linux-generic
-```
+# 2. CVE 与版本判断
 
-不要把下面命令作为本文的内核升级主流程：
+本文处理：
 
-```bash
-sudo apt upgrade
-```
+- `CVE-2026-43284`：Dirty Frag，涉及 XFRM ESP 和 RxRPC 路径；
+- `CVE-2026-46300`：Fragnesia，涉及 XFRM ESP-in-TCP 路径。
 
-`apt upgrade` 面向系统已安装软件包的整体升级；本文只针对 `linux-generic` 及 APT 为它解析出的必要依赖。
+Ubuntu Jammy 使用大量 backport，**不能直接用上游 Linux kernel 小版本号判断是否修复**。
 
-> **产品定制系统例外：** 如果设备的 `/boot`、EFI、GRUB、initramfs 或 kernel 更新链被产品厂商改造，不能仅根据 `/etc/os-release` 判断它可直接使用 Ubuntu 原生 `linux-generic`。先执行第 3 章检查；若命中第 8 章特殊场景，停止标准升级，按产品兼容性或临时缓解流程处理。
-
----
-
-## 2. `dpkg`、`apt` 与 `apt-get` 的关系
-
-- `dpkg` 是底层 Debian 包管理器，负责 `.deb` 的解包、配置和状态数据库。
-- `apt` / `apt-get` 位于更高层，负责软件源、依赖解析和下载，最终仍调用 `dpkg` 完成安装。
-- `apt install linux-generic` 与 `apt-get install linux-generic` 在交互式安装结果上通常一致；脚本和生产 SOP 更推荐 `apt-get`，接口和输出更稳定。
-
-### 为什么升级前要求 `dpkg --audit` 无输出
-
-执行：
-
-```bash
-sudo dpkg --audit
-```
-
-正常结果：**无输出**。
-
-如果出现：
+应以 Canonical package fixed version 为准：
 
 ```text
-unpacked but not yet configured
-half installed
+Jammy GA 5.15 fixed >= 5.15.0-181.191
 ```
 
-或者 `dpkg -l` 中有 `iF`、`iU`、`pH` 等异常状态，说明之前的安装事务尚未完成。此时再执行 `apt-get install linux-generic`，APT 可能先尝试配置这些异常包，导致整个新内核安装再次失败。
-
-可以先尝试：
+查询当前运行内核：
 
 ```bash
-sudo dpkg --configure -a
+uname -r
 ```
 
-然后再次确认：
+查询对应 Ubuntu package version：
 
 ```bash
-sudo dpkg --audit
+dpkg-query -W -f='${Package}\t${Version}\t${Status}\n' "linux-image-$(uname -r)" 2>/dev/null || \
+dpkg-query -W -f='${Package}\t${Version}\t${Status}\n' "linux-image-unsigned-$(uname -r)" 2>/dev/null
 ```
 
-如果仍有输出，**停止升级，先解决现有包故障**。
+# 3. 升级前通用检查
 
-对于第 8 章所述 `/boot=vfat` 产品定制系统，如果 `dpkg --configure -a` 已经明确因为 hard-link / symlink 能力不足而失败，不要反复执行该命令；先停止 APT/DPKG 内核事务并进入产品特殊场景处置。
-
----
-
-# 3. 环境检查与备份
-
-本章是在线和离线升级的共同前置条件。硬检查未通过时不要继续安装新内核。
-
-## 3.1 系统与架构
+先收集：
 
 ```bash
 cat /etc/os-release
-uname -r
+uname -a
 dpkg --print-architecture
+sudo dpkg --audit
+apt-mark showhold
+findmnt /
+findmnt /boot
+findmnt /boot/efi 2>/dev/null || true
+lsblk -f
+df -h /boot
+ls -lh /boot/vmlinuz-* /boot/initrd.img-* 2>/dev/null
+command -v dkms >/dev/null && dkms status || true
+command -v mokutil >/dev/null && mokutil --sb-state || true
+systemctl --failed --no-pager
+command -v docker >/dev/null && docker ps -a || true
 ```
 
-本文要求至少确认：
+## 3.1 `dpkg --audit` 为什么必须检查
 
-```text
-VERSION_ID="22.04"
-VERSION_CODENAME=jammy
-amd64
-```
-
-`uname -r` 记录的是**当前已经启动并正在运行的内核**。安装新内核后、重启之前，它仍会显示旧版本。
-
-## 3.2 检查包管理状态
+标准 Ubuntu 正常状态下：
 
 ```bash
 sudo dpkg --audit
 ```
 
-必须无输出。
+应无输出。
 
-再查看当前内核相关包：
+如果已有 `iF`、`iU`、`pH` 等半安装状态，新 APT 事务可能会先尝试配置旧故障包，导致问题扩大。
 
-```bash
-dpkg -l | grep -E 'linux-(generic|image|modules|headers|base)'
-```
+对于普通 Ubuntu，可以先排查并修复现有 dpkg 状态。
 
-检查是否有 hold：
+对于本文 `/boot=vfat` 特殊场景，如果已经明确是 kernel postinst 在 VFAT 上失败，**不要在原 VFAT `/boot` 状态下反复执行 `dpkg --configure -a`**，直接进入第 6 章。
 
-```bash
-apt-mark showhold
-```
-
-如果 `linux-generic`、`linux-image-generic`、`linux-headers-generic` 被 hold，应先确认原因，不要直接解除。
-
-## 3.3 检查当前 GA 元包和 Candidate
+## 3.2 `/boot` 文件系统是关键门禁
 
 ```bash
-dpkg-query -W -f='${Package}\t${Version}\t${Status}\n' linux-generic 2>/dev/null || true
+findmnt -no TARGET,SOURCE,FSTYPE,OPTIONS /boot
 ```
 
-```bash
-apt-cache policy linux-generic linux-image-generic
-```
-
-如果当前运行 5.15，但 `linux-generic` 未安装，通常说明产品镜像曾手工安装 versioned kernel、删除过元包，或者使用定制 kernel 管理方式。确认产品允许标准 Ubuntu kernel 更新后，安装 `linux-generic` 可以重新建立 GA 内核跟踪关系。
-
-## 3.4 检查 `/boot` 文件系统
-
-```bash
-findmnt /
-findmnt /boot
-findmnt /boot/efi 2>/dev/null || true
-```
-
-标准 Ubuntu kernel package 需要 `/boot` 具备 Linux 文件系统正常的 hard-link / symlink 语义。
-
-如果看到：
+如果 `/boot` 是：
 
 ```text
-/boot  ...  vfat
+ext4
+xfs
 ```
 
-**停止升级。**
+可继续走标准 Ubuntu 流程。
 
-本项目在产品打包 Ubuntu 22.04.5 中已实测：把 VFAT/FAT16 分区直接挂到 `/boot` 会导致标准 `linux-image` 安装失败。
+如果是：
 
-进一步做 `/boot` hard-link 测试：
+```text
+vfat
+fat
+msdos
+```
+
+不要直接安装 kernel package。
+
+可用临时测试进一步确认：
 
 ```bash
-sudo bash -c 't=/boot/.kernel-hardlink-test.$$; : > "$t"; ln "$t" "$t.link"; rc=$?; ls -li "$t" "$t.link" 2>/dev/null || true; rm -f "$t" "$t.link"; exit $rc'
+sudo bash -c 't=/boot/.kernel-link-test.$$; : > "$t"; ln "$t" "$t.hard"; rc1=$?; ln -s "$t" "$t.sym"; rc2=$?; rm -f "$t" "$t.hard" "$t.sym"; echo "hardlink_rc=$rc1 symlink_rc=$rc2"'
 ```
 
-成功条件：命令退出码为 0，两个测试文件 inode 相同。
-
-如果出现：
+在 VFAT 上通常会看到：
 
 ```text
 Operation not permitted
 ```
 
-禁止继续 kernel update，转第 8 章。
+# 4. 标准 Ubuntu：只升级 GA 内核
 
-## 3.5 检查 `/boot` 空间
+本章只适用于 `/boot` 具有正常 Linux 文件系统语义、dpkg 状态正常的普通 Ubuntu。
 
-```bash
-df -h /boot
-df -Pm /boot
-```
-
-建议生产环境预留至少约 500 MiB 可用空间。不要为了腾空间直接执行 `apt autoremove`；升级和回退窗口结束前必须保留当前正在运行的旧内核。
-
-查看现有启动文件：
-
-```bash
-ls -lh /boot/vmlinuz-* /boot/initrd.img-* 2>/dev/null
-```
-
-## 3.6 DKMS、Secure Boot 和关键业务
-
-```bash
-command -v dkms >/dev/null && dkms status || echo "DKMS not installed"
-```
-
-```bash
-command -v mokutil >/dev/null && mokutil --sb-state || echo "mokutil not installed"
-```
-
-若存在 NVIDIA、ZFS、VMware、第三方网卡/RAID 等 out-of-tree module，必须确认对目标 kernel ABI 的兼容性。
-
-记录网络和业务基线：
-
-```bash
-ip -br addr
-ip route
-systemctl --failed --no-pager
-command -v docker >/dev/null && docker ps -a || true
-```
-
-## 3.7 升级前备份
-
-```bash
-BK="/root/kernel-upgrade-backup-$(date +%Y%m%d-%H%M%S)"
-sudo mkdir -p "$BK"
-echo "$BK"
-```
-
-```bash
-uname -a | sudo tee "$BK/uname-a.txt" >/dev/null
-cat /etc/os-release | sudo tee "$BK/os-release.txt" >/dev/null
-dpkg-query -W -f='${Package}\t${Version}\t${Status}\n' | sudo tee "$BK/dpkg-packages.txt" >/dev/null
-lsblk -f | sudo tee "$BK/lsblk.txt" >/dev/null
-findmnt | sudo tee "$BK/findmnt.txt" >/dev/null
-ip addr | sudo tee "$BK/ip-addr.txt" >/dev/null
-ip route | sudo tee "$BK/ip-route.txt" >/dev/null
-sudo cp -a /etc/fstab "$BK/fstab"
-sudo cp -a /etc/apt "$BK/etc-apt"
-sudo cp -a /etc/default/grub "$BK/" 2>/dev/null || true
-sudo cp -a /boot/grub "$BK/boot-grub" 2>/dev/null || true
-command -v docker >/dev/null && docker ps -a --no-trunc | sudo tee "$BK/docker-ps.txt" >/dev/null || true
-```
-
-生成备份文件校验：
-
-```bash
-sudo find "$BK" -type f -exec sha256sum {} \; | sudo tee "$BK/SHA256SUMS" >/dev/null
-```
-
----
-
-# 4. 国内 APT 镜像配置（可选）
-
-如果当前 Ubuntu 官方源访问稳定，可以跳过本章。以下只是中国大陆网络环境的镜像加速配置，不改变 Ubuntu 的 package 管理逻辑。
-
-先备份：
-
-```bash
-sudo cp -a /etc/apt/sources.list "/etc/apt/sources.list.backup.$(date +%Y%m%d-%H%M%S)"
-```
-
-写入阿里云 Jammy 源时，必须通过配置文件写入，**不要把单独的 `deb ...` 行直接当 Shell 命令执行**：
-
-```bash
-sudo tee /etc/apt/sources.list >/dev/null <<'EOF'
-deb https://mirrors.aliyun.com/ubuntu/ jammy main restricted universe multiverse
-deb https://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe multiverse
-deb https://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe multiverse
-deb https://mirrors.aliyun.com/ubuntu/ jammy-backports main restricted universe multiverse
-EOF
-```
-
-更新索引：
+刷新索引：
 
 ```bash
 sudo apt-get update
 ```
 
-必须无 Release、GPG 或 repository 错误。
-
----
-
-# 5. 在线升级：只升级 GA 内核
-
-本章流程独立完整。
-
-## 5.1 刷新 APT 索引
-
-```bash
-sudo apt-get update
-```
-
-这一步只刷新仓库元数据，不安装软件。
-
-## 5.2 查看候选版本
+查看候选版本：
 
 ```bash
 apt-cache policy linux-generic
 ```
 
-以目标主机实际显示的 `Candidate` 为准。
-
-## 5.3 模拟安装
+模拟：
 
 ```bash
 sudo apt-get -s install linux-generic
 ```
 
-重点检查：
-
-- 是否安装 `linux-image-*`、`linux-modules-*`、`linux-modules-extra-*`、`linux-headers-*` 等内核相关包；
-- 是否出现异常删除业务软件；
-- 是否仍提示 `not fully installed or removed`；
-- 是否存在依赖错误。
-
-如果出现：
-
-```text
-N not fully installed or removed
-```
-
-停止正式安装，先执行：
-
-```bash
-sudo dpkg --audit
-```
-
-解决现有异常包。
-
-## 5.4 正式安装
+确认不会异常删除业务软件后正式安装：
 
 ```bash
 sudo apt-get install linux-generic
 ```
 
-该操作只以 `linux-generic` 为安装目标，并由 APT 解析它需要的依赖；不会等同于对整机执行 `apt upgrade`。
-
-安装完成必须确认命令退出成功。
-
-## 5.5 安装后、重启前检查
+安装后：
 
 ```bash
 sudo dpkg --audit
-```
-
-必须无输出。
-
-查看内核包：
-
-```bash
-dpkg -l | grep -E 'linux-(generic|image-[0-9]|modules-[0-9])'
-```
-
-目标新版本应为 `ii`，不能是 `iF`、`iU`、`pH`。
-
-检查新旧 kernel 与 initrd：
-
-```bash
-ls -lh /boot/vmlinuz-* /boot/initrd.img-* 2>/dev/null
-```
-
-明确刷新 GRUB：
-
-```bash
+sudo apt-get check
+ls -lh /boot/vmlinuz-* /boot/initrd.img-*
 sudo update-grub
 ```
 
-查看启动项：
+重启前必须确认：
 
-```bash
-grep -nE '^(menuentry|submenu)|^[[:space:]]*(linux|linuxefi|initrd|initrdefi|search|set root)' /boot/grub/grub.cfg
-```
+- 新 kernel 的 `vmlinuz` 存在；
+- 新 kernel 的 `initrd.img` 存在；
+- GRUB 有新 kernel 的 `linux` 和 `initrd` 行；
+- 旧 kernel 仍保留；
+- 有 Console/IPMI/iDRAC/iLO 等回退手段。
 
-必须确认：
-
-1. 新 kernel 有对应 `vmlinuz`；
-2. 新 kernel 有对应 `initrd`；
-3. 旧 kernel 启动项仍存在；
-4. 有 IPMI/iDRAC/iLO/KVM/VM Console 等带外回退能力。
-
-## 5.6 重启
+维护窗口重启：
 
 ```bash
 sudo sync
 sudo reboot
 ```
 
-## 5.7 验收
-
-系统重新上线后：
+上线后：
 
 ```bash
 uname -r
+sudo dpkg --audit
+sudo apt-get check
 ```
 
-只有 reboot 后的 `uname -r` 才能证明新 kernel 真正生效。
+# 5. 特殊场景根因：VFAT `/boot`
 
-确认 package：
+## 5.1 实测产品布局
 
-```bash
-dpkg-query -W -f='${Package}\t${Version}\t${Status}\n' "linux-image-$(uname -r)" 2>/dev/null || true
-```
-
-GA 5.15 对本次两个 CVE 的基线判断：
-
-```bash
-VER="$(dpkg-query -W -f='${Version}' "linux-image-$(uname -r)")"; dpkg --compare-versions "$VER" ge "5.15.0-181.191" && echo FIXED || echo NOT_FIXED
-```
-
-再做业务验收：
-
-```bash
-systemctl --failed --no-pager
-ip -br addr
-ip route
-command -v docker >/dev/null && docker ps -a || true
-```
-
-并执行产品实际 HTTP/API/数据库/端口健康检查。
-
----
-
-# 6. 完全离线升级：只准备 `linux-generic` 及依赖
-
-推荐使用 Ubuntu Jammy 仓库提供的 `apt-offline`，由目标离线机生成精确下载需求，再由联网机下载 package 和 dependencies。
-
-## 6.1 目标机准备 `apt-offline`
-
-如果设备还能临时联网，先安装：
-
-```bash
-sudo apt-get update
-sudo apt-get install apt-offline
-```
-
-之后断网。
-
-## 6.2 离线机生成 APT 索引下载需求
-
-```bash
-mkdir -p /data/kernel-offline
-sudo apt-offline set /data/kernel-offline/update.sig --update
-```
-
-把 `update.sig` 传到联网 Ubuntu 主机。
-
-## 6.3 联网机下载索引
-
-```bash
-sudo apt-get update
-sudo apt-get install apt-offline
-apt-offline get update.sig --bundle update.zip
-```
-
-把 `update.zip` 传回目标离线机。
-
-## 6.4 离线机导入索引
-
-```bash
-sudo apt-offline install update.zip
-apt-cache policy linux-generic
-```
-
-## 6.5 生成仅针对 GA 内核的下载需求
-
-```bash
-sudo apt-offline set /data/kernel-offline/kernel.sig --install-packages linux-generic
-```
-
-把 `kernel.sig` 传到联网机。
-
-## 6.6 联网机下载内核及依赖
-
-```bash
-apt-offline get kernel.sig --bundle kernel-bundle.zip
-sha256sum kernel-bundle.zip > kernel-bundle.zip.sha256
-```
-
-把两个文件传回离线目标机。
-
-## 6.7 离线机校验并导入
-
-```bash
-sha256sum -c kernel-bundle.zip.sha256
-sudo apt-offline install kernel-bundle.zip
-```
-
-## 6.8 模拟离线安装
-
-```bash
-sudo apt-get -s --no-download install linux-generic
-```
-
-如果提示缺包或需要联网，停止并重新生成 `apt-offline` 下载需求。
-
-## 6.9 正式离线安装
-
-```bash
-sudo apt-get --no-download install linux-generic
-```
-
-随后按在线流程的“安装后、重启前检查 → reboot → 验收”执行。
-
----
-
-# 7. 回退
-
-升级窗口结束前不要执行：
-
-```bash
-sudo apt autoremove
-```
-
-也不要删除 `uname -r` 当前对应的旧内核。
-
-如果新内核启动失败，通过带外 Console 进入 GRUB，选择旧版本：
+谛听硬件版实测：
 
 ```text
-Ubuntu, with Linux <old-version>
-```
-
-启动后确认：
-
-```bash
-uname -r
-systemctl --failed --no-pager
-ip -br addr
-ip route
-command -v docker >/dev/null && docker ps -a || true
-```
-
-只有确认已经使用旧 kernel 且业务正常，才评估是否删除故障的新版本。
-
----
-
-# 8. 特殊场景：产品定制 Ubuntu 无法直接升级内核
-
-本章适用于“底层是 Ubuntu 22.04，但产品厂商改造了启动分区、GRUB、initramfs、kernel 包或系统升级链”的设备。此类系统不能把普通 Ubuntu Server 的升级 SOP 直接照搬到生产环境。
-
-核心原则：
-
-1. **正式修复优先级最高：** 最终目标仍是运行包含 Canonical 修复的 kernel，临时措施不能替代正式补丁。
-2. **先识别产品启动链：** `/boot`、EFI、GRUB、initramfs 或 kernel 管理机制存在定制时，先验证兼容性。
-3. **标准升级不兼容时停止 APT 内核事务：** 不反复执行 `apt-get install linux-generic`、`dpkg --configure -a`、`update-initramfs` 或 `update-grub` 试错。
-4. **无法立即升级时才使用补偿性缓解：** 对 Dirty Frag / Fragnesia，可在业务确认不依赖相关功能后临时屏蔽受影响模块。
-5. **版本扫描可能继续报警：** 模块屏蔽是运行时补偿措施，不会改变 `uname -r`，不能把扫描器的版本型告警消失作为验收标准。
-
-## 8.1 快速决策表
-
-| 场景 | 建议动作 |
-| --- | --- |
-| 标准 Ubuntu，`dpkg --audit` 无输出，`/boot` 支持 hard-link/symlink | 按第 5/6 章升级 `linux-generic` |
-| 产品定制系统，厂商提供 kernel/固件升级包 | 优先使用厂商升级链，并确认 CVE backport 状态 |
-| 产品定制系统，`/boot=vfat` 或 hard-link 测试失败 | 不执行标准 Ubuntu kernel 安装，进入本章临时缓解评估 |
-| 已尝试升级，出现 `iF/iU`、新 `vmlinuz` 有但 `initrd` 缺失 | 不重启、不继续叠加新 kernel，保留旧内核运行并进入故障处置 |
-| IPsec/XFRM、AFS/RxRPC 正在使用 | 不使用模块屏蔽方案，联系产品/二线评估替代措施 |
-| `esp4/esp6/rxrpc` 为 built-in 而非可卸载 `.ko` | modprobe 屏蔽方案不适用，必须优先获得修复 kernel |
-
-## 8.2 实测案例：VFAT `/boot` 与 Ubuntu 原生 kernel package 不兼容
-
-实测产品镜像：
-
-```text
-Ubuntu 22.04.5 LTS
-amd64
-当前运行内核：5.15.0-72-generic
+Ubuntu 22.04 LTS / amd64
 UEFI
-/dev/sda2 ext4 -> /
-/dev/sda1 vfat/FAT16 -> /boot
+/dev/sda2 ext4       -> /
+/dev/sda1 VFAT FAT16 -> /boot
 ```
 
-产品启动链为：
-
-```text
-UEFI
-  ↓
-/dev/sda1 VFAT
-  ↓
-/boot/EFI/BOOT/BOOTX64.EFI
-  ↓
-/boot/grub/grub.cfg
-  ↓
-/boot/vmlinuz-*
-/boot/initrd.img-*
-  ↓
-/dev/sda2 ext4 rootfs
-```
-
-该产品把 EFI、GRUB、kernel 和 initrd 全部放在同一个 VFAT `/boot`：
+产品把 EFI、GRUB、kernel、initrd 全部放在 260MB VFAT `/boot`：
 
 ```text
 /dev/sda1 VFAT
@@ -602,25 +229,23 @@ UEFI
     └── initrd.img-*
 ```
 
-执行标准安装：
+GRUB 从 VFAT 直接读取带版本号的 kernel/initrd，再挂载 ext4 rootfs。
 
-```bash
-sudo apt-get install linux-generic
+## 5.2 直接安装为什么失败
+
+在 VFAT `/boot` 上执行 Ubuntu 原生 kernel 安装，现场出现：
+
+```text
+ln: failed to create hard link ... Operation not permitted
 ```
 
-实测出现：
+以及：
 
 ```text
 Failed to create symlink to vmlinuz-...: Operation not permitted
 ```
 
-`update-initramfs` 还可能出现：
-
-```text
-ln: failed to create hard link '/boot/initrd.img-....dpkg-bak' ...: Operation not permitted
-```
-
-随后 package 状态可能变成：
+随后可能出现：
 
 ```text
 linux-image-<new>      iF
@@ -628,344 +253,653 @@ linux-image-generic    iU
 linux-generic          iU
 ```
 
-新 `vmlinuz` 可能已经解包到 `/boot`，但新 `initrd.img` 不存在。GRUB 甚至可能生成一个只有 `linux /vmlinuz-<new>`、没有对应 `initrd` 的不完整启动项。
+典型现象是：
+
+```text
+/boot/vmlinuz-<new>          已出现
+/boot/initrd.img-<new>       未生成
+```
+
+GRUB 甚至可能出现只有 `linux /vmlinuz-<new>`、没有 `initrd` 的不完整启动项。
+
+因此：
+
+- `linux-generic is already the newest version` 不等于升级成功；
+- `vmlinuz` 文件存在不等于升级成功；
+- package 仍为 `iF/iU` 时禁止重启；
+- 新 kernel 缺 `initrd` 时禁止重启。
+
+## 5.3 现场还存在的 appliance 差异
+
+实测设备同时存在：
+
+- `/var/lib/apt/lists` 不存在；
+- 原内核不是通过 `linux-generic` 元包持续跟踪；
+- 产品网络由自身 minion 维护；
+- 业务依赖 Docker、KVM、Intel 网卡、iptables 等 kernel 能力；
+- GRUB 默认隐藏且 `GRUB_TIMEOUT=0`；
+- VFAT 曾存在 dirty bit；
+- `/boot` 总容量只有约 260MB。
+
+因此不能只修 dpkg，还必须把启动、空间和产品业务一起纳入验收。
+
+# 6. 特殊硬件正式修复：已验证流程
+
+本章是本次实机验证通过的主方案。
+
+核心思路：
+
+```text
+正常状态：
+/dev/sda1 VFAT -> /boot
+
+内核安装维护窗口：
+/dev/sda1 VFAT -> 临时挂载点
+/dev/sda2 ext4 -> /boot（根分区中的目录）
+
+在 ext4 /boot 完成：
+安装 kernel -> initramfs -> dpkg configure -> GRUB
+
+然后：
+只把真实版本文件回写 VFAT
+-> 恢复 /dev/sda1 到 /boot
+-> 在最终真实布局下再次 update-grub
+-> reboot
+```
+
+> 临时 ext4 `/boot` 阶段禁止重启。
+
+## 6.1 强制前置条件
+
+执行前必须同时满足：
+
+1. 已取得维护窗口；
+2. 串口/IPMI等带外 Console 可用，并确认能进入 GRUB；
+3. 已保存升级前网络、服务、容器、iptables/KVM/网卡基线；
+4. 已确认 `/boot=/dev/sda1 vfat`、`/=/dev/sda2 ext4`；
+5. 已备份 VFAT `/boot`；
+6. 目标 kernel 是 Jammy GA 5.15，package version 不低于 `5.15.0-181.191`；
+7. 旧 kernel 在新 kernel 完成重启验收前不得删除；
+8. 不安装 HWE 6.8；
+9. 不执行 `apt upgrade`、`full-upgrade`、`dist-upgrade`；
+10. 回写前执行 VFAT 容量门禁，并预留至少 32MiB。
+
+## 6.2 建立备份与基线
+
+```bash
+sudo -i
+set -euo pipefail
+stamp=$(date +%Y%m%d%H%M%S)
+backup_dir="/var/backups/dsensor-kernel-upgrade-$stamp"
+mkdir -p "$backup_dir"
+
+uname -a > "$backup_dir/uname-before.txt"
+findmnt > "$backup_dir/findmnt-before.txt"
+lsblk -f > "$backup_dir/lsblk-before.txt"
+dpkg -l | grep -E 'linux-(image|modules|generic)' > "$backup_dir/kernel-packages-before.txt" || true
+systemctl --failed --no-pager > "$backup_dir/systemctl-failed-before.txt" || true
+command -v docker >/dev/null && docker ps -a --no-trunc > "$backup_dir/docker-before.txt" || true
+cp -a /etc/fstab "$backup_dir/fstab"
+cp -a /etc/default/grub "$backup_dir/grub-default" 2>/dev/null || true
+
+tar -C /boot -cf "$backup_dir/boot-vfat-before.tar" .
+sha256sum "$backup_dir/boot-vfat-before.tar" > "$backup_dir/boot-vfat-before.tar.sha256"
+```
+
+确认备份存在：
+
+```bash
+test -s "$backup_dir/boot-vfat-before.tar"
+sha256sum -c "$backup_dir/boot-vfat-before.tar.sha256"
+```
+
+## 6.3 VFAT dirty bit 修复
+
+**只能在卸载状态写修复。**
+
+```bash
+sync
+umount /boot
+fsck.fat -a /dev/sda1
+mount /boot
+```
+
+如果需要确认 dirty bit 已清除，要再次干净卸载后只读检查：
+
+```bash
+sync
+umount /boot
+fsck.fat -vn /dev/sda1
+mount /boot
+```
+
+不要在 VFAT 已挂载时用 `fsck.fat -vn` 判断 dirty bit，因为重新挂载本身会设置 dirty 状态，容易得出错误结论。
+
+## 6.4 使用独立临时 APT 索引
+
+特殊 appliance 不建议为了这次 kernel 修复直接重建整个宿主 APT 状态。
+
+建立独立 lists/cache：
+
+```bash
+apt_probe=/var/tmp/dsensor-kernel-apt
+rm -rf "$apt_probe"
+mkdir -p "$apt_probe/lists/partial" "$apt_probe/cache/archives/partial"
+```
+
+`apt_source` 必须指向现场已经确认可达、包含 `jammy-security` 的 source 文件。如果宿主 `/etc/apt/sources.list` 可直接使用：
+
+```bash
+apt_source=/etc/apt/sources.list
+```
+
+如果宿主 source 中包含失效的产品内网镜像，应先准备一个**临时、仅用于本次操作**且包含可达 `jammy-security` 的 source 文件，再把 `apt_source` 指向它；不要为了本次维护永久修改宿主源。
+
+更新临时索引：
+
+```bash
+apt-get \
+  -o Dir::State::lists="$apt_probe/lists" \
+  -o Dir::Cache="$apt_probe/cache" \
+  -o Dir::Etc::sourcelist="$apt_source" \
+  -o Dir::Etc::sourceparts=- \
+  -o APT::Get::List-Cleanup=0 \
+  update
+```
+
+查询目标 kernel。以下以实测成功的 `5.15.0-191` 为例：
+
+```bash
+target_kernel=5.15.0-191
+apt-cache -o Dir::State::lists="$apt_probe/lists" policy \
+  "linux-image-$target_kernel-generic" \
+  "linux-modules-$target_kernel-generic" \
+  "linux-modules-extra-$target_kernel-generic"
+```
+
+如果 191 已被新版本替代，选择仓库当前最新 Jammy GA 5.15，但不得低于官方修复下限。
+
+## 6.5 临时暴露 ext4 `/boot`
+
+先定义路径：
+
+```bash
+vfat_boot="/var/lib/dsensor/boot-vfat-$stamp"
+mkdir -p "$vfat_boot"
+```
+
+确认当前布局：
+
+```bash
+test "$(findmnt -no SOURCE /boot)" = /dev/sda1
+test "$(findmnt -no FSTYPE /boot)" = vfat
+test "$(findmnt -no FSTYPE /)" = ext4
+```
+
+切换：
+
+```bash
+sync
+umount /boot
+mount /dev/sda1 "$vfat_boot"
+mkdir -p /boot
+cp -aL "$vfat_boot"/. /boot/
+```
+
+确认：
+
+```bash
+test -z "$(findmnt -no SOURCE /boot 2>/dev/null || true)"
+test "$(findmnt -no SOURCE "$vfat_boot")" = /dev/sda1
+test "$(findmnt -no FSTYPE "$vfat_boot")" = vfat
+test "$(findmnt -no FSTYPE /)" = ext4
+```
 
 此时：
 
+- `/boot` 是根分区 ext4 中的普通目录；
+- 原 VFAT 被挂在 `$vfat_boot`；
+- **当前状态绝对禁止 reboot。**
+
+> `cp -aL` 在这里的方向是 **VFAT -> ext4**，本次实测可用。后面的 ext4 -> VFAT 回写禁止使用 `cp -aL`。
+
+### 已证伪：不要使用 `mount --move`
+
+本机真实宿主执行：
+
+```bash
+mount --move /boot <临时目录>
+```
+
+受 mount propagation / 层级约束失败，因此正式 SOP 使用“`umount /boot` 后重新挂载 `/dev/sda1` 到临时目录”。
+
+## 6.6 显式安装 image/modules/modules-extra
+
+对于该 appliance，不推荐安装整个 `linux-generic` 元包。
+
+原因：元包会额外引入 headers、firmware、microcode 等，本次安全修复没有必要扩大变更面。
+
+使用临时 APT 索引显式安装三包：
+
+```bash
+apt-get \
+  -o Dir::State::lists="$apt_probe/lists" \
+  -o Dir::Cache="$apt_probe/cache" \
+  -o Dir::Etc::sourcelist="$apt_source" \
+  -o Dir::Etc::sourceparts=- \
+  install --no-install-recommends \
+  "linux-image-$target_kernel-generic" \
+  "linux-modules-$target_kernel-generic" \
+  "linux-modules-extra-$target_kernel-generic"
+```
+
+完成 package configure：
+
+```bash
+dpkg --configure -a
+update-initramfs -u -k "$target_kernel-generic"
+update-grub
+dpkg --audit
+apt-get check
+```
+
+要求：
+
+```text
+dpkg --audit     无输出
+apt-get check    无依赖错误
+```
+
+> 如果已经经历过一次 VFAT `/boot` 直接安装失败，此步骤也用于在 ext4 `/boot` 环境中完成遗留的 kernel package configure。
+
+## 6.7 验证新旧 kernel 和 initrd
+
+```bash
+new_kernel="$target_kernel-generic"
+old_kernel="$(uname -r)"
+
+test -s "/boot/vmlinuz-$new_kernel"
+test -s "/boot/initrd.img-$new_kernel"
+test -s "/boot/vmlinuz-$old_kernel"
+test -s "/boot/initrd.img-$old_kernel"
+
+grep -F "$new_kernel" /boot/grub/grub.cfg
+grep -F "$old_kernel" /boot/grub/grub.cfg
+ls -ld "/lib/modules/$new_kernel"
+```
+
+如果产品依赖 Intel 网卡、NVMe、RAID 等驱动，检查新 initramfs：
+
+```bash
+lsinitramfs "/boot/initrd.img-$new_kernel" | grep -E '/(igb|ixgbe|nvme|megaraid).*\.ko'
+```
+
+## 6.8 VFAT 容量门禁
+
+回写前必须按真实 regular file 大小计算，不能只看 `du` 或凭经验估算。
+
+```bash
+regular_bytes=$(find /boot -type f -printf '%s\n' | awk '{s+=$1} END{print s+0}')
+vfat_total=$(findmnt -bno SIZE "$vfat_boot")
+reserve=$((32 * 1024 * 1024))
+
+echo "regular_file_bytes=$regular_bytes"
+echo "vfat_total=$vfat_total"
+echo "required_with_reserve=$((regular_bytes + reserve))"
+
+test "$((regular_bytes + reserve))" -lt "$vfat_total"
+test "$(findmnt -no SOURCE "$vfat_boot")" = /dev/sda1
+test "$(findmnt -no FSTYPE "$vfat_boot")" = vfat
+```
+
+容量门禁失败：
+
+- 不删除旧 kernel；
+- 不回写；
+- 不重启；
+- 保持现场并评估扩容 ESP 或产品永久整改。
+
+## 6.9 回写 VFAT：只复制真实文件，不展开 symlink
+
+再次确认备份和目标挂载：
+
+```bash
+test -s "$backup_dir/boot-vfat-before.tar"
+test "$(findmnt -no SOURCE "$vfat_boot")" = /dev/sda1
+test "$(findmnt -no FSTYPE "$vfat_boot")" = vfat
+mountpoint -q "$vfat_boot"
+```
+
+清空 VFAT 旧目录树：
+
+```bash
+find "$vfat_boot" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+```
+
+回写：
+
+```bash
+rsync -rltD --no-links /boot/ "$vfat_boot"/
+sync
+```
+
+验证：
+
+```bash
+test -z "$(find "$vfat_boot" -type l -print -quit)"
+test -s "$vfat_boot/vmlinuz-$new_kernel"
+test -s "$vfat_boot/initrd.img-$new_kernel"
+test -s "$vfat_boot/vmlinuz-$old_kernel"
+test -s "$vfat_boot/initrd.img-$old_kernel"
+grep -F "$new_kernel" "$vfat_boot/grub/grub.cfg"
+df -h "$vfat_boot"
+```
+
+### 为什么必须 `--no-links`
+
+ext4 `/boot` 会有：
+
+```text
+vmlinuz
+vmlinuz.old
+initrd.img
+initrd.img.old
+```
+
+这些是 convenience symlink，但本产品 GRUB 不依赖它们。
+
+现场已经证伪：
+
+- `cp -aL` 用于 **ext4 -> VFAT** 会试图保留 hard-link 关系，报 `Operation not permitted`；
+- `rsync --copy-links --no-hard-links` 会展开上述链接，重复复制大体积 kernel/initrd，最终 `No space left on device`。
+
+因此实测有效方案是：
+
+```bash
+rsync -rltD --no-links
+```
+
+只复制带版本号的真实文件。
+
+## 6.10 恢复真实 VFAT `/boot`，再生成最终 GRUB
+
+```bash
+umount "$vfat_boot"
+mount /boot
+```
+
+确认：
+
+```bash
+test "$(findmnt -no SOURCE /boot)" = /dev/sda1
+test "$(findmnt -no FSTYPE /boot)" = vfat
+```
+
+**必须在真实最终挂载布局恢复之后再次：**
+
+```bash
+update-grub
+```
+
+检查：
+
+```bash
+grep -nE 'menuentry|linux[[:space:]]|initrd[[:space:]]' /boot/grub/grub.cfg
+```
+
+新 kernel 必须同时有类似：
+
+```text
+linux  /vmlinuz-5.15.0-191-generic ...
+initrd /initrd.img-5.15.0-191-generic
+```
+
+旧 kernel 启动项也必须存在。
+
+> 临时 ext4 `/boot` 阶段生成的 `grub.cfg` 不能直接当最终配置使用。恢复 VFAT 后再执行 `update-grub`，才能生成产品真实启动视角下的 `/vmlinuz-*`、`/initrd.img-*` 路径。
+
+## 6.11 重启前门禁
+
 ```bash
 uname -r
-```
-
-仍显示旧内核才是正常的当前运行状态。**不能因为 `linux-generic is already the newest version` 或 `/boot/vmlinuz-<new>` 已存在就判断升级成功。**
-
-根因是 VFAT/FAT 不具备标准 Linux hard-link / symlink 语义，而 Ubuntu `linux-image` maintainer scripts、`linux-update-symlinks`、`update-initramfs` 在 kernel 安装流程中依赖这些能力。
-
-因此这不是某一个 `5.15.0-187`、`5.15.0-190` 包损坏；只要维持该 `/boot=vfat` 设计，Ubuntu 原生 kernel package 的同类操作仍可能重复失败。
-
-### 已失败设备的立即处置原则
-
-如果已经出现上述状态：
-
-- 保持当前已验证可运行的旧 kernel；
-- 不删除旧 `vmlinuz/initrd`；
-- 不执行 `apt autoremove`；
-- 新 kernel 没有完整 initrd 或 package 仍为 `iF/iU` 时，不要直接 reboot；
-- 不通过修改 `/usr/bin/linux-update-symlinks`、跳过 maintainer script 等方式强行把 dpkg 状态改成成功；
-- 先确定产品的正式 kernel/启动链修复方案，再清理失败事务。
-
-## 8.3 无法立即升级时的临时缓解
-
-Canonical 对 Dirty Frag 的临时缓解是阻止并卸载：
-
-- `esp4`：IPv4 IPsec ESP；
-- `esp6`：IPv6 IPsec ESP；
-- `rxrpc`：AF_RXRPC，常见于 AFS 等功能。
-
-Fragnesia 使用相同的 ESP/XFRM 攻击面，Canonical 的缓解是屏蔽 `esp4`、`esp6`；因此同时按 Dirty Frag 方案屏蔽 `esp4`、`esp6`、`rxrpc` 可以覆盖本文两个漏洞涉及的临时缓解入口。
-
-这属于**补偿性安全措施**，不是正式内核补丁。
-
-可能受影响：
-
-- StrongSwan、Libreswan 等使用内核 IPsec ESP 的 VPN；
-- 基于 XFRM/IPsec 的专线、SD-WAN；
-- RxRPC / AFS / OpenAFS。
-
-通常不会直接影响普通 TCP/UDP、Docker bridge/host 网络、OpenVPN、WireGuard、NFS、SMB，但仍必须做现场业务验收，不能仅按协议名称推断无影响。
-
-本产品特殊场景不额外执行：
-
-- `user.max_user_namespaces=0` 或同类全局 namespace 禁用，避免无必要扩大到容器/沙箱能力；
-- `drop_caches`，它不是本文采用的预防性措施，且可能造成明显 I/O 和性能抖动；
-- `update-grub`；
-- `update-initramfs`。
-
-### 为什么这里不执行 Canonical 官方流程中的 `update-initramfs`
-
-Canonical 的通用临时缓解建议在写入 modprobe 配置后执行：
-
-```bash
-sudo update-initramfs -u -k all
-```
-
-目的是让屏蔽配置进入 initramfs，避免模块在 early boot 被提前加载。
-
-但本章讨论的产品正是因为 VFAT `/boot` 导致 `update-initramfs` hard-link 操作失败，因此**不能在已知不兼容的设备上机械执行这一命令**。
-
-代价是：本章给出的产品临时方案主要用于**当前运行周期**以及 rootfs 加载后的后续 `modprobe` 请求。若设备发生重启，必须重新检查 `esp4/esp6/rxrpc` 是否被 early boot/initramfs 加载；在产品完成 boot/initramfs 兼容性整改前，不应把该配置描述成“无条件跨重启永久生效”。
-
-## 8.4 临时缓解执行条件
-
-执行前必须确认：
-
-1. 产品版本和系统版本属于已验证范围；
-2. 客户/业务方接受临时关闭 IPsec ESP 和 RxRPC/AFS 能力；
-3. 设备不承担 IPsec VPN、IPsec 专线、SD-WAN 或 AFS 服务；
-4. 当前有稳定管理连接，并具备异常时现场或带外回退能力；
-5. 先在单台设备实施并验证，不直接批量扩散；
-6. 当前业务无与本变更无关的异常。
-
-## 8.5 变更前只读检查
-
-```bash
-sudo -i
-
-date
-uname -a
-cat /etc/os-release
-
-echo '=== module files ==='
-for module in esp4 esp6 rxrpc; do
-    echo "[$module]"
-    modinfo -F filename "$module" 2>&1 || true
-done
-
-echo '=== loaded modules ==='
-lsmod | awk 'NR == 1 || $1 ~ /^(esp4|esp6|rxrpc)$/'
-
-echo '=== XFRM state and policy ==='
-ip xfrm state
-ip xfrm policy
-
-echo '=== possible IPsec processes ==='
-pgrep -af 'charon|starter|pluto|strongswan|libreswan|ipsec' || true
-
-echo '=== possible AFS mounts ==='
-findmnt -t afs,openafs || true
-grep -E '(^|[[:space:]])(afs|openafs)([[:space:]]|$)' /proc/mounts || true
-
-echo '=== baseline services ==='
-systemctl --failed --no-pager
-command -v docker >/dev/null && docker ps --format '{{.Names}}\t{{.Status}}' || true
-```
-
-出现以下任一情况停止操作：
-
-- `ip xfrm state` 或 `ip xfrm policy` 存在有效配置；
-- 检查到 StrongSwan、Libreswan、charon、pluto 等 IPsec 进程；
-- 检查到 AFS/OpenAFS 挂载；
-- `modinfo -F filename` 显示目标功能为 built-in，而不是 `.ko` / `.ko.xz` / `.ko.zst` 模块；
-- `lsmod` 中目标模块使用计数不为 `0`；
-- 当前已有与本次操作无关的业务故障。
-
-## 8.6 实施临时模块屏蔽
-
-以下脚本只写入一份 modprobe 配置，并卸载**当前已经加载且未被使用**的目标模块。任一目标模块卸载或验证失败时，脚本会删除新配置并尝试恢复变更前已加载的模块。
-
-```bash
-sudo -i
-bash <<'FIELD_EOF'
-set -euo pipefail
-
-modules='esp4 esp6 rxrpc'
-config_file='/etc/modprobe.d/99-kernel-cve-2026-mitigation.conf'
-stamp=$(date +%Y%m%d%H%M%S)
-backup_dir="/var/backups/kernel-cve-2026-${stamp}"
-state_file="${backup_dir}/modules.loaded"
-
-umask 077
-mkdir -p "$backup_dir"
-: > "$state_file"
-
-if [ -e "$config_file" ]; then
-    echo "STOP: $config_file already exists; verify its origin before continuing." >&2
-    exit 1
-fi
-
-for module in $modules; do
-    filename=$(modinfo -F filename "$module")
-    case "$filename" in
-        *.ko|*.ko.xz|*.ko.zst) ;;
-        *)
-            echo "STOP: $module is not a removable module: $filename" >&2
-            exit 1
-            ;;
-    esac
-
-    if lsmod | awk -v name="$module" '$1 == name { found=1 } END { exit !found }'; then
-        echo "$module" >> "$state_file"
-        refcount=$(lsmod | awk -v name="$module" '$1 == name { print $3 }')
-        if [ "$refcount" != '0' ]; then
-            echo "STOP: $module is in use; refcount=$refcount" >&2
-            exit 1
-        fi
-    fi
-done
-
-cat > "$config_file" <<'CONF_EOF'
-# Temporary mitigation for Dirty Frag / Fragnesia related module paths.
-# Remove this file after a validated fixed kernel is running.
-install esp4 /bin/false
-install esp6 /bin/false
-install rxrpc /bin/false
-blacklist esp4
-blacklist esp6
-blacklist rxrpc
-CONF_EOF
-chmod 0644 "$config_file"
-
-rollback_on_error() {
-    rc=$?
-    trap - ERR INT TERM
-    echo 'ERROR: module mitigation failed; restoring previous state.' >&2
-    rm -f "$config_file"
-    while IFS= read -r module; do
-        [ -n "$module" ] && modprobe "$module" || true
-    done < "$state_file"
-    exit "$rc"
-}
-trap rollback_on_error ERR INT TERM
-
-for module in $modules; do
-    if lsmod | awk -v name="$module" '$1 == name { found=1 } END { exit !found }'; then
-        modprobe -r "$module"
-    fi
-done
-
-for module in $modules; do
-    modprobe -n -v "$module" | grep -Eq '^install[[:space:]]+/bin/false([[:space:]]|$)'
-    if lsmod | awk -v name="$module" '$1 == name { found=1 } END { exit !found }'; then
-        echo "ERROR: $module is still loaded." >&2
-        false
-    fi
-done
-
-trap - ERR INT TERM
-printf 'Mitigation applied.\nBackup directory: %s\n' "$backup_dir"
-FIELD_EOF
-```
-
-记录脚本最后输出的备份目录。
-
-## 8.7 变更后验证
-
-```bash
-echo '=== block configuration ==='
-cat /etc/modprobe.d/99-kernel-cve-2026-mitigation.conf
-
-echo '=== modprobe dry run ==='
-for module in esp4 esp6 rxrpc; do
-    modprobe -n -v "$module"
-done
-
-echo '=== loaded modules; expected header only ==='
-lsmod | awk 'NR == 1 || $1 ~ /^(esp4|esp6|rxrpc)$/'
-
-echo '=== service verification ==='
+findmnt -no TARGET,SOURCE,FSTYPE /boot
+ls -lh /boot/vmlinuz-* /boot/initrd.img-*
+grep -nE 'menuentry|linux[[:space:]]|initrd[[:space:]]' /boot/grub/grub.cfg
+dpkg --audit
+apt-get check
 systemctl --failed --no-pager
 command -v docker >/dev/null && docker ps --format '{{.Names}}\t{{.Status}}' || true
 ip -br addr
 ip route
 ```
 
-验收标准：
-
-- 三个 `modprobe -n -v` 均显示 `install /bin/false`；
-- `lsmod` 中不存在 `esp4`、`esp6`、`rxrpc`；
-- 管理网络和产品业务正常；
-- Docker 容器数量、名称和健康状态与变更前一致；
-- `systemctl --failed` 没有新增故障项；
-- 产品自身探针、流量处理、告警、API 等关键能力完成实测。
-
-如设备后续发生 reboot，必须重新执行：
+只有全部通过，并确认带外 Console 和旧 kernel 回滚方法以后，才能：
 
 ```bash
-grep -E '^(esp4|esp6|rxrpc) ' /proc/modules || echo 'affected modules are not loaded'
-for module in esp4 esp6 rxrpc; do modprobe -n -v "$module"; done
+sync
+reboot
 ```
 
-在没有成功执行并验证 `update-initramfs` 的产品环境中，不能跳过这一项。
-
-## 8.8 临时缓解回滚
-
-先找到本次备份目录：
+## 6.12 重启后产品级验收
 
 ```bash
-ls -ld /var/backups/kernel-cve-2026-*
+uname -r
+findmnt -no TARGET,SOURCE,FSTYPE /boot
+dpkg --audit
+apt-get check
+systemctl --failed --no-pager
+systemctl is-active minion hwminion ssh docker 2>/dev/null || true
+command -v docker >/dev/null && docker ps --format '{{.Names}}\t{{.Status}}' || true
+ip -br addr
+ip route
+iptables -S
+command -v nft >/dev/null && nft list ruleset || true
+lsmod | grep -E '^(igb|ixgbe|kvm|kvm_intel|overlay|bridge)' || true
+curl -kfsS -o /dev/null -w 'https=%{http_code}\n' https://127.0.0.1/ || true
 ```
 
-确认时间后：
+验收至少包括：
+
+- `uname -r` 为目标修复 kernel；
+- `/boot` 已恢复 `/dev/sda1` VFAT；
+- 新旧 kernel/initrd 均存在；
+- `dpkg --audit` 无输出；
+- `apt-get check` 通过；
+- 产品全部容器正常；
+- minion/SSH/Docker 等关键服务正常；
+- 管理 IP、路由、DNS 正常；
+- Intel 网卡/KVM/overlay/bridge 正常；
+- iptables/nftables 与产品流量处理正常；
+- Web/API 等产品能力正常；
+- 没有新增失败服务。
+
+# 7. 临时缓解：只在正式升级前过渡使用
+
+正式修复无法立即实施时，可在确认业务不依赖相关功能后，临时屏蔽：
+
+```text
+esp4
+esp6
+rxrpc
+```
+
+执行前检查：
 
 ```bash
-sudo -i
-backup_dir='/var/backups/kernel-cve-2026-请替换为本次时间戳'
-state_file="${backup_dir}/modules.loaded"
-config_file='/etc/modprobe.d/99-kernel-cve-2026-mitigation.conf'
-
-test -d "$backup_dir"
-test -f "$state_file"
-rm -f "$config_file"
-
-# 只恢复变更前已经加载的模块，不额外加载原本未使用的模块
-while IFS= read -r module; do
-    [ -n "$module" ] && modprobe "$module"
-done < "$state_file"
-
 for module in esp4 esp6 rxrpc; do
-    modprobe -n -v "$module"
+    echo "[$module]"
+    modinfo -F filename "$module" 2>&1 || true
 done
 
 lsmod | awk 'NR == 1 || $1 ~ /^(esp4|esp6|rxrpc)$/'
-systemctl --failed --no-pager
-command -v docker >/dev/null && docker ps --format '{{.Names}}\t{{.Status}}' || true
+ip xfrm state
+ip xfrm policy
+pgrep -af 'charon|starter|pluto|strongswan|libreswan|ipsec' || true
+findmnt -t afs,openafs || true
 ```
 
-回滚后重新检查网络、产品主服务、探针、流量处理和告警。
+出现以下任一情况，不执行模块屏蔽：
 
-## 8.9 产品长期整改
+- 有有效 XFRM/IPsec state/policy；
+- StrongSwan/Libreswan/charon/pluto 正在运行；
+- AFS/OpenAFS 正在使用；
+- 模块为 built-in；
+- 模块已经加载且 refcount 非 0。
 
-临时模块屏蔽仅用于无法立即安装修复 kernel 的过渡期。产品侧最终应完成以下工作：
+屏蔽配置示例：
 
-1. 明确 kernel 是由 Ubuntu APT 维护，还是由产品升级包维护；
-2. 如果使用厂商 kernel，明确 CVE backport 版本和升级/回滚方法；
-3. 如果希望兼容 Ubuntu 标准 APT kernel，评估把启动布局标准化为：
+```bash
+cat >/etc/modprobe.d/99-dsensor-cve-2026-mitigation.conf <<'EOF'
+install esp4 /bin/false
+install esp6 /bin/false
+install rxrpc /bin/false
+blacklist esp4
+blacklist esp6
+blacklist rxrpc
+EOF
+chmod 0644 /etc/modprobe.d/99-dsensor-cve-2026-mitigation.conf
+```
+
+验证：
+
+```bash
+for module in esp4 esp6 rxrpc; do
+    modprobe -n -v "$module"
+done
+```
+
+正式修复 kernel 已启动并完成产品验收后：
+
+```bash
+rm -f /etc/modprobe.d/99-dsensor-cve-2026-mitigation.conf
+```
+
+不要主动加载变更前本来就没有使用的模块。
+
+> 模块屏蔽不会改变 `uname -r`，版本型 HIDS/扫描器仍可能报警。它是补偿性措施，不是正式修复。
+
+# 8. 正式升级失败恢复
+
+## 8.1 仍处于临时 ext4 `/boot`
+
+**禁止重启。**
+
+如果决定放弃本次升级，使用升级前 VFAT tar 恢复原启动分区：
+
+```bash
+test "$(findmnt -no FSTYPE "$vfat_boot")" = vfat
+test -s "$backup_dir/boot-vfat-before.tar"
+mountpoint -q "$vfat_boot"
+
+find "$vfat_boot" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+tar -C "$vfat_boot" -xf "$backup_dir/boot-vfat-before.tar"
+sync
+umount "$vfat_boot"
+mount /boot
+findmnt /boot
+```
+
+确认旧 kernel/initrd 和 GRUB 后再评估是否重启。
+
+## 8.2 新 kernel 无法启动
+
+通过串口/IPMI进入 GRUB，选择旧 kernel。
+
+启动后保留现场：
+
+```bash
+uname -r
+findmnt /boot
+journalctl -b -1 -p err --no-pager
+command -v docker >/dev/null && docker ps || true
+ip -br addr
+ip route
+```
+
+旧 kernel 完成业务回滚验收前，不删除任何 kernel 文件。
+
+# 9. 已证伪或禁止的操作
+
+特殊硬件场景不要采用：
+
+- 直接在 VFAT `/boot` 上执行 `apt install linux-*`；
+- 把 HWE 6.8 当作默认修复路径；
+- `apt upgrade` / `full-upgrade` / `dist-upgrade` 顺带升级整机；
+- 提前删除唯一旧 kernel 腾空间；
+- 直接修改 `/usr/bin/linux-update-symlinks` 或跳过 maintainer scripts；
+- 仅修改 `/etc/fstab` 就把产品强改成 `/boot/efi`；
+- `mount --move /boot <临时目录>`：本机实测失败；
+- ext4 -> VFAT 使用 `cp -aL`：本机实测 `Operation not permitted`；
+- `rsync --copy-links --no-hard-links`：本机实测展开 symlink 后写满 VFAT；
+- 在已挂载 VFAT 上用 `fsck.fat -vn` 判断 dirty bit；
+- `user.max_user_namespaces=0` 作为本次默认缓解；
+- `drop_caches`；
+- 无必要执行 `update-initramfs -u -k all`；
+- kernel/initrd/GRUB 未完整时 reboot；
+- `apt autoremove` 清理旧 kernel。
+
+# 10. 产品永久整改
+
+本次方案是在不改变产品最终启动布局的前提下完成安全修复，但 `/boot=vfat` 与 Ubuntu 原生 kernel 生命周期仍存在结构性冲突。
+
+产品后续建议改为标准 UEFI 布局：
 
 ```text
-root/ext4 -> /boot
-EFI/VFAT  -> /boot/efi
+/dev/sda2 ext4
+└── /boot
+    ├── grub/
+    ├── vmlinuz-*
+    └── initrd.img-*
+
+/dev/sda1 VFAT
+└── /boot/efi
+    └── EFI/...
 ```
 
-4. 在同版本测试设备完成 EFI、GRUB、kernel、initrd、业务启动和旧 kernel 回退测试；
-5. 正式补丁 kernel 运行并验收通过后，再移除临时 modprobe 屏蔽配置；
-6. 保存实施记录，向安全扫描/审计侧说明临时缓解不改变 kernel version，因此版本型 HIDS 可能继续报告漏洞。
+产品发布前需要验证：
 
-> 不要直接在生产设备上只修改 `/etc/fstab` 把 `/boot` 改成 `/boot/efi`。这是启动架构整改，不是普通配置变更。
+1. ESP 挂载 `/boot/efi`；
+2. `/boot` 保持 Linux 文件系统语义；
+3. `grub-install --efi-directory=/boot/efi` 与产品启动链兼容；
+4. 明确由 Ubuntu GA 元包还是产品自有机制维护 kernel；
+5. 软件源和 APT 索引具备可维护性；
+6. 可同时保留至少两套 kernel；
+7. 实机验证冷启动、旧 kernel 回滚、Intel 网卡、KVM、Docker、minion、iptables/nftables 和全部产品流量路径。
 
----
+# 11. 本次实机验证结果
 
-# 9. 常见停止条件
+2026-09-04 实测最终状态：
 
-遇到以下任一情况时停止 kernel 安装：
+```text
+修复前运行：5.15.0-72-generic
+修复后运行：5.15.0-191-generic
+修复后 package：5.15.0-191.201
+官方最低修复：5.15.0-181.191
+```
 
-- `dpkg --audit` 非空；
-- 存在 `iF`、`iU`、`pH` kernel package；
-- `/boot` 是 `vfat/fat/msdos`；
-- `/boot` hard-link 测试失败；
-- `/boot` 空间不足；
-- DKMS 对目标 ABI 未确认；
-- APT 模拟安装出现异常删除包；
-- 新 kernel 缺少 `initrd`；
-- GRUB 中没有旧 kernel 回退项；
-- 没有带外 Console 回退能力。
+结果：
 
-特殊场景下，出现以下任一情况时也停止临时模块屏蔽：
+- 测试机真实 reboot 成功；
+- `/boot` 恢复为 `/dev/sda1` VFAT；
+- VFAT 回写后约使用 148MB、剩余约 113MB；
+- 新旧 kernel/initrd 和 GRUB 启动项均保留；
+- `dpkg --audit`、`apt-get check` 通过；
+- 产品 10 个业务容器正常；
+- minion、hwminion、SSH、Docker 正常；
+- 管理网络、默认路由、DNS 正常；
+- Intel `igb`、KVM、overlay、bridge 正常；
+- iptables 和产品流量处理正常；
+- HTTPS 正常；
+- 临时 `esp4/esp6/rxrpc` 屏蔽已撤销；
+- 未发现本次 kernel 升级引入新的系统或产品故障。
 
-- 存在有效 XFRM/IPsec state 或 policy；
-- StrongSwan/Libreswan/charon/pluto 正在运行；
-- AFS/OpenAFS 正在挂载；
-- 目标模块为 built-in；
-- 目标模块 refcount 非 0；
-- 产品业务已经存在异常，无法建立可靠变更前基线。
+这套流程已经从“推测方案”升级为**实机验证 SOP**。
 
----
-
-# 10. 官方参考
+# 12. 官方参考
 
 - Canonical CVE-2026-43284：<https://ubuntu.com/security/CVE-2026-43284>
 - Canonical CVE-2026-46300：<https://ubuntu.com/security/CVE-2026-46300>
-- Canonical Dirty Frag 临时缓解：<https://ubuntu.com/blog/dirty-frag-linux-vulnerability-fixes-available>
-- Canonical Fragnesia 临时缓解：<https://ubuntu.com/blog/fragnesia-linux-vulnerability-fixes-available>
-- Ubuntu Jammy `linux-generic`：<https://packages.ubuntu.com/jammy/amd64/linux-generic>
-- Ubuntu Jammy `apt-get` manpage：<https://manpages.ubuntu.com/manpages/jammy/man8/apt-get.8.html>
-- Ubuntu Jammy `apt-offline` manpage：<https://manpages.ubuntu.com/manpages/jammy/man8/apt-offline.8.html>
-- Ubuntu Kernel HWE 参考：<https://documentation.ubuntu.com/kernel/reference/hwe-kernels/>
+- Canonical Dirty Frag：<https://ubuntu.com/blog/dirty-frag-linux-vulnerability-fixes-available>
+- Canonical Fragnesia：<https://ubuntu.com/blog/fragnesia-linux-vulnerability-fixes-available>
+- Ubuntu Jammy `apt-get`：<https://manpages.ubuntu.com/manpages/jammy/man8/apt-get.8.html>
+- Ubuntu Kernel HWE：<https://documentation.ubuntu.com/kernel/reference/hwe-kernels/>
