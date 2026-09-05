@@ -4,15 +4,13 @@
 
 ## 文档信息
 
-| 字段 | 内容 |
-| --- | --- |
-| 技术领域 | macOS / 电源管理 / Kernel Panic |
-| 适用范围 | MacBook Pro，重点为 Apple Silicon；Intel 机型部分命令也适用 |
-| 典型机型 | 2022 MacBook Pro 13-inch M2 |
-| 风险等级 | 排查低风险；修改 `pmset` 为中风险 |
-| 文档状态 | 已整理，需结合故障机日志验证 |
-| 最后验证 | 2026-09-05 |
-| 主要来源 | Apple Support、macOS `pmset` / `log` 手册、Apple Community 案例 |
+- **技术领域**：macOS / 电源管理 / Kernel Panic
+- **适用范围**：MacBook Pro，重点为 Apple Silicon；Intel 机型部分命令也适用
+- **典型机型**：2022 MacBook Pro 13-inch M2
+- **风险等级**：排查低风险；修改 `pmset` 为中风险
+- **文档状态**：已整理，需结合故障机日志验证
+- **最后验证**：2026-09-05
+- **主要来源**：Apple Support、macOS `pmset` / `log` 手册、Apple Community 案例
 
 ## 1. 现象与判断原则
 
