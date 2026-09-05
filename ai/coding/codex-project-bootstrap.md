@@ -6,13 +6,11 @@
 
 ## 文档信息
 
-| 字段 | 内容 |
-| --- | --- |
-| 技术领域 | AI Coding / Codex / 项目工程化 |
-| 适用范围 | Web、API、AI 应用、内部工具、通用软件项目 |
-| 文档状态 | 推荐基线 |
-| 最后验证 | 2026-09-03 |
-| 主要参考 | OpenAI Codex、OpenAI Cookbook、GitHub Spec Kit、FastAPI Full Stack Template、Next.js |
+- **技术领域**：AI Coding / Codex / 项目工程化
+- **适用范围**：Web、API、AI 应用、内部工具、通用软件项目
+- **文档状态**：推荐基线
+- **最后验证**：2026-09-03
+- **主要参考**：OpenAI Codex、OpenAI Cookbook、GitHub Spec Kit、FastAPI Full Stack Template、Next.js
 
 ## 1. 推荐技术基线
 
