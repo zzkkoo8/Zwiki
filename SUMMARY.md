@@ -7,6 +7,7 @@
     * [服务器双分区启动 U 盘](infrastructure/hardware/bootable-usb-fat32-exfat.md)
   * [系统](infrastructure/system/README.md)
     * [Ubuntu22 内核漏洞安全加固](infrastructure/system/ubuntu22-kernel-security-hardening.md)
+    * [macOS 合盖后崩溃重启排查](infrastructure/system/macos-lid-close-restart.md)
   * [网络](infrastructure/network/README.md)
   * [基础服务](infrastructure/services/README.md)
 
