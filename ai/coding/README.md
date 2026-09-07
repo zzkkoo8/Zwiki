@@ -4,7 +4,7 @@ AI Coding 关注如何用 Coding Agent 完成软件开发工作，包括需求�
 
 ## 内容入口
 
-- [FDE 技能路线图](fde-skills-roadmap.md)：从零基础到高级 FDE，按技能类型和难度梳理 AI 协作、Git、Web、UI/UX、前端、后端、全栈交付、Agent 与客户现场服务能力。
+- [FDE 60 天技能表](fde-skills-roadmap.md)：每天 1 小时，从零基础按顺序训练 AI 协作、Git、Web、UI/UX、React、FastAPI、数据库、全栈交付、Agent 与客户现场能力；每项都包含可验收任务和在线学习资源。
 - [ChatGPT 与 Codex](chatgpt-codex.md)：ChatGPT 的研究、搜索、Deep Research、Plugin / Skill 用法，以及 Codex 的仓库操作、`AGENTS.md`、Skill、审查和协同开发流程。
 - [Vibe Coding](vibe-coding.md)：把 Coding Agent 纳入完整开发流程，通过分阶段门禁、真实验证和 Git 回退实现稳定交付。
 - [Codex 项目开局规范](codex-project-bootstrap.md)：新项目开工前的 AI 友好技术栈、最小目录结构、必备 Markdown 文件模板，以及 GitHub Flow + Spec Kit 开局基线。
