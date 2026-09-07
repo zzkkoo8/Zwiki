@@ -15,6 +15,7 @@
   * [Docker](cloud-native/docker/README.md)
   * [Kubernetes](cloud-native/kubernetes/README.md)
   * [K3s](cloud-native/k3s/README.md)
+    * [产品运行底座：K3s 集群部署手册](cloud-native/k3s/product-runtime-k3s-deployment.md)
 
 * [开发](development/README.md)
   * [工程平台](development/platforms/README.md)
