@@ -1,391 +1,185 @@
-# FDE 技能路线图
+# FDE 60 天必备技能表
 
-这是一份面向 AI 辅助开发场景的 FDE（Forward Deployed Engineer）技能路线。目标不是一次学完所有技术，而是按难度逐级形成能力：**先能看懂和修改 → 能独立做前后端项目 → 能稳定生产交付 → 能承担客户现场与 Agent 系统的端到端责任**。
+这是一份面向 AI 辅助开发场景的 FDE（Forward Deployed Engineer）每日训练表。目标不是 60 小时后达到 OpenAI FDE 的招聘资历，而是用 **每天 1 小时**，从零开始建立一套可执行的 FDE 基础能力：能让 AI 稳定完成前端、后端和 Agent 项目，能自己验收结果，并逐步具备客户发现、技术范围、系统设计、生产交付和复盘沉淀能力。
 
-本文结合 Zwiki 现有 FDE / Vibe Coding 规范，并参考 OpenAI 当前 Forward Deployed Engineer、Forward Deployed Software Engineer 及垂直行业 FDE 招聘要求整理。具体开发流程见 [Vibe Coding](vibe-coding.md)，项目开局规则见 [Codex 项目开局规范](codex-project-bootstrap.md)，技术栈和工具索引见 [开发 / 技术栈与工具](../../development/tooling/README.md)。
+OpenAI 当前 FDE 岗位强调端到端交付：从 discovery、technical scoping、system design、build 到 production rollout，并通过 production adoption、workflow impact 和 eval-driven feedback 衡量结果。FDSWE 岗位同时强调 full-stack、迭代式开发、客户现场协作和可复用工程抽象。因此本表不是传统“前端课 + 后端课”的拼接，而是按 FDE 实际交付顺序设计。
 
-## 文档信息
+> OpenAI 当前通用 FDE 岗位通常要求 5+ 年工程或技术部署经验，并包含 customer-facing 工作。真实项目经验不能由课程替代；本表解决的是“每天练什么、练到什么程度”。
 
-| 字段 | 内容 |
-| --- | --- |
-| 技术领域 | FDE / AI Coding / Web 全栈 / Agent |
-| 适用范围 | 零基础到可独立交付前端、后端、Agent 与客户现场项目 |
-| 默认技术基线 | React + TypeScript + Vite、FastAPI + PostgreSQL、Docker Compose；Go 用于客户机单文件服务 |
-| 文档状态 | 已按 OpenAI FDE 当前招聘要求复核 |
-| 最后验证 | 2026-09-08 |
-| 主要来源 | OpenAI Careers FDE / FDSWE、FDE 开发规范、Zwiki AI Coding 规范 |
+## 使用方法
 
-## 1. OpenAI 当前 FDE 岗位能力画像
-
-OpenAI 当前 FDE 岗位的共性并不是“某一个框架熟练”，而是**端到端技术交付能力**。官方岗位描述反复强调以下职责：
-
-- 从 discovery、technical scoping、system design、build 一直到 production rollout 全程负责；
-- 从第一版 prototype 推进到 stable production，并以真实生产采用和业务效果判断成功；
-- 能写和 Review 生产级前端、后端代码，常见语言包括 Python、JavaScript 或同类技术栈；
-- 能构建和部署 LLM / generative AI 系统，并理解模型行为如何影响产品体验；
-- 深入客户团队，理解业务流程、技术限制和真实使用场景；
-- 能拆范围、安排交付顺序、提前发现阻塞，并在 scope / speed / quality 之间做权衡；
-- 使用 eval-driven feedback、错误分析和现场反馈持续改进系统；
-- 把成功经验沉淀成工具、playbook、reference architecture 或可复用 building blocks；
-- 能与客户工程师、产品、研究、安全、GRC、GTM 等不同角色清晰协作；
-- 在受监管或高风险场景中进一步处理隐私、安全、授权、治理、审计、human review、escalation 和 launch criteria。
-
-### 经验门槛不是技能项
-
-OpenAI 当前通用 FDE 岗位通常要求 **5+ 年工程或技术部署经验，并包含 customer-facing 工作**；医疗等垂直 FDE 岗位可要求 6+ 年相关经验。
-
-这类要求无法通过“看完课程”获得，因此本路线将其视为**工作经验门槛**，而不是某一条学习技能。技能表解决的是“应该具备哪些能力以及如何验证”，真实项目负责年限仍需在工作中积累。
-
-## 2. 难度分级与学习顺序
-
-| 等级 | 定位 | 达标标准 |
-| --- | --- | --- |
-| **L0 基础** | 完全零基础 | 能看懂项目、运行环境、HTTP 请求和 Git 变更，在 AI 辅助下安全完成小修改 |
-| **L1 初级** | 独立完成简单项目 | 能用 AI 完成一个带真实 API、数据库和页面的 CRUD 全栈项目，并自己验收 |
-| **L2 中级** | 稳定生产交付 | 能负责接口、权限、测试、CI、Docker、日志、部署、回滚和基本可观测性 |
-| **L3 高级** | 对标 FDE 职责 | 能负责客户发现、复杂系统设计、Agent/Evals、生产采用、风险权衡、handoff 和持续反馈 |
-
-推荐顺序：
+每天只做一行，不建议跳级。固定 1 小时：
 
 ```text
-L0 全部完成
-  ↓
-L1 全部完成
-  ↓
-至少 1 个真实全栈项目
-  ↓
-L2 稳定交付
-  ↓
-多个真实生产项目
-  ↓
-L3 FDE / Agent / 客户现场能力
+15 分钟：阅读当天资料，只看与任务直接相关的部分
+35 分钟：让 AI 辅助完成当天动手任务
+10 分钟：自己执行命令、操作页面或检查结果，完成验收
 ```
 
-**不要跳级。前一阶段不能稳定验收时，不建议继续堆更高级框架。**
+执行规则：
+
+1. **当天未验收通过，不进入下一天。**
+2. AI 必须遵循 [Vibe Coding](vibe-coding.md) 的 `Inspect → Plan → Patch → Verify`。
+3. 不要求背语法；要求能解释关键概念、能让 AI 正确实现、能识别明显错误、能亲自验收。
+4. 默认全栈技术基线：`React + TypeScript + Vite + Ant Design + FastAPI + PostgreSQL + Docker Compose`。
+5. Go 是客户机单文件服务补充能力；Agent 主线使用 OpenAI API / Agents SDK / MCP。
 
 ---
 
-# L0 基础：先具备“能跟着 AI 正确开发”的能力
+## 第 1 阶段：开发与 AI 基础（Day 1–10）
 
-## 3. FDE 与 AI 协作基础
+| Day | 难度 | 技能类型 | 今日技能 | 1 小时任务 / 验收 | 在线学习资源 |
+| ---: | --- | --- | --- | --- | --- |
+| 1 | L0 | FDE | 理解 FDE 是什么 | 阅读 OpenAI FDE 岗位；用自己的话写出 `发现问题 → 设计 → 开发 → 上线 → 反馈` 五步职责 | [OpenAI FDE](https://openai.com/careers/forward-deployed-engineer-%28fde%29-seattle-seattle/) |
+| 2 | L0 | AI Coding | 把需求写成可验收任务 | 选一个小功能，写清目标、非目标、输入、输出、异常、验收方式 | [Zwiki：Vibe Coding](vibe-coding.md) |
+| 3 | L0 | AI Coding | Gate 分阶段开发 | 把一个小项目拆成 3 个 Gate，并为每个 Gate 写“通过条件” | [Zwiki：Vibe Coding](vibe-coding.md) |
+| 4 | L0 | Linux / CLI | 终端、目录和文件 | 完成 `pwd/ls/cd/mkdir/cp/mv/rm/cat/grep` 基本操作，并能找到项目日志和配置文件 | [Linux 101](https://101.lug.ustc.edu.cn/) |
+| 5 | L0 | 网络 | HTTP / REST / JSON | 用浏览器 Network 或 `curl` 请求一个 API，指出 Method、Header、Body、Status Code | [MDN HTTP 中文](https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Guides/Overview) |
+| 6 | L0 | Git | 工作区、暂存区、提交 | 新建仓库，修改文件并完成 `status → diff → add → commit` | [Pro Git 中文版](https://git-scm.com/book/zh/v2) |
+| 7 | L0 | Git | 分支和远端 | 创建 feature 分支，完成一次 `switch/push/pull` | [Pro Git 中文版](https://git-scm.com/book/zh/v2) |
+| 8 | L0 | Git | PR / MR | 在测试仓库提交一次 Pull Request，并写改动说明和验证结果 | [GitHub PR 中文文档](https://docs.github.com/zh/pull-requests) |
+| 9 | L0 | Git | 回退与恢复 | 制造一次错误修改，分别练习 `restore`、`revert`；知道 reflog 用于什么 | [Pro Git 中文版](https://git-scm.com/book/zh/v2) |
+| 10 | L0 | AI Coding | AI Code Review | 让 AI 生成一段有明显问题的代码，人工检查硬编码、Secret、未处理异常、无关改动，并要求修复 | [GitHub Copilot 提示工程](https://docs.github.com/zh/copilot/concepts/prompting/prompt-engineering) |
 
-| 技能 | 最小验收标准 |
-| --- | --- |
-| 理解 FDE 端到端职责 | 能说明需求发现、技术范围、设计、开发、上线、验收和反馈之间的关系 |
-| 把需求写成可验收规格 | 写清目标、非目标、输入输出、边界条件、失败路径和验收命令 |
-| 固定项目技术栈 | 开发前明确前端、后端、数据库、测试和部署方案，禁止 AI 自行换栈 |
-| 分阶段 Gate 开发 | 当前阶段验收未通过时，不允许进入下一阶段 |
-| Inspect → Plan → Patch → Verify | AI 先读项目、给最小计划、小步修改并执行真实验证 |
-| 基本 AI Code Review | 能检查明显的无关修改、硬编码、Secret、未处理异常和虚构 API |
-
-## 4. Git 与开发环境
-
-| 技能 | 最小验收标准 |
-| --- | --- |
-| 终端与项目目录 | 能切换目录、查看文件、搜索文本、读取日志和执行项目命令 |
-| 环境变量与 Secret | 配置通过环境变量注入，`.env`、Token、密码不进入 Git |
-| Git 工作区 / 暂存区 / Commit | 能解释 working tree、staging、commit 的区别 |
-| status / diff / add / commit | 提交前能看清修改，只提交当前任务相关文件 |
-| branch / switch / fetch / pull / push | 能完成 feature 分支从创建到推送的完整流程 |
-| 基本回退 | 能用 restore / revert 等安全撤销错误修改 |
-
-## 5. Web、浏览器与网络基础
-
-| 技能 | 最小验收标准 |
-| --- | --- |
-| HTML 语义结构 | 能用 header、nav、main、form、table 等元素搭出页面骨架 |
-| CSS 盒模型与层叠 | 理解 margin、padding、border、选择器、继承和优先级 |
-| Flexbox 与 Grid | 能完成左右布局、居中和卡片网格，不依赖大量绝对定位 |
-| JavaScript 基础与异步 | 掌握变量、函数、数组对象、模块、Promise 和 async/await |
-| HTTP / REST / JSON | 能解释 URL、Method、Header、Body、状态码和 JSON |
-| CORS 与代理 | 能说明跨域原因，并用前端代理或后端 CORS 正确解决 |
-| 浏览器 DevTools | 会使用 Elements、Console、Network、Storage 和响应式模式定位问题 |
-
-## 6. UI / UX 基础
-
-| 技能 | 最小验收标准 |
-| --- | --- |
-| 从用户任务设计信息架构 | 先确定用户要完成什么，再设计菜单、页面和主次操作 |
-| 低保真线框图 | 编码前画出导航、内容区、表格、表单、弹窗和主要流程 |
-| 视觉层级与排版 | 能通过字号、字重、留白、对齐和对比建立清晰层级 |
-| 组件优先意识 | 已有 Button、Form、Table、Dialog 时不让 AI 重造基础组件 |
-
-### L0 里程碑
-
-完成一个极简练习：
-
-```text
-读取现有仓库
-→ 新建 feature 分支
-→ 用 AI 修改一个简单页面或接口
-→ 自己检查 diff
-→ 启动项目
-→ 用浏览器 / curl 验证
-→ Commit
-```
-
-达到这一阶段后，应能判断“代码到底有没有运行成功”，而不是只相信 AI 的文字说明。
+**阶段验收：** 能安全使用 Git 修改项目；能把需求拆成小任务；能判断 AI 是否真的完成，而不是只相信回复文字。
 
 ---
 
-# L1 初级：独立完成一个简单前后端项目
+## 第 2 阶段：Web 与 UI 基础（Day 11–20）
 
-## 7. React 前端基础工程
+| Day | 难度 | 技能类型 | 今日技能 | 1 小时任务 / 验收 | 在线学习资源 |
+| ---: | --- | --- | --- | --- | --- |
+| 11 | L0 | Web | HTML 语义结构 | 手写或让 AI 生成一个含 Header、Nav、Main、Form、Table 的页面，并能解释各区域 | [MDN 学习 Web 开发](https://developer.mozilla.org/zh-CN/docs/Learn_web_development) |
+| 12 | L0 | Web | CSS 盒模型 | 修改 margin、padding、border、width，使用 DevTools 验证盒模型变化 | [MDN CSS 中文](https://developer.mozilla.org/zh-CN/docs/Learn_web_development/Core/Styling_basics) |
+| 13 | L0 | Web | Flexbox / Grid | 完成一个左侧菜单 + 主内容区和一个三列卡片布局 | [MDN CSS 布局](https://developer.mozilla.org/zh-CN/docs/Learn_web_development/Core/CSS_layout) |
+| 14 | L0 | Web | JavaScript 基础 | 完成变量、数组、对象、函数、条件和循环的小练习 | [MDN JavaScript 中文](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Guide) |
+| 15 | L0 | Web | 异步与 fetch | 用 `fetch + async/await` 请求一个 JSON API，并把结果输出到页面 | [MDN JavaScript 中文](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Guide) |
+| 16 | L0 | Web | 浏览器 DevTools | 用 Elements、Console、Network、Storage 定位一个前端报错 | [Chrome DevTools 中文](https://developer.chrome.com/docs/devtools?hl=zh-cn) |
+| 17 | L0 | UI / UX | 信息架构和线框图 | 为“用户管理”画列表页、详情页、新增页的低保真线框图 | [Ant Design 设计体系](https://ant.design/docs/spec/introduce-cn/) |
+| 18 | L0 | UI / UX | 视觉层级与 Design Token | 固定字号、主色、间距、圆角；把一个杂乱页面改成统一风格 | [Ant Design 设计价值观](https://ant.design/docs/spec/values-cn/) |
+| 19 | L0 | UI / UX | 页面状态 | 为列表页补齐 Loading、Empty、Error、Success、No Permission 五种状态 | [Ant Design 组件总览](https://ant.design/components/overview-cn/) |
+| 20 | L0 | UI / UX | 响应式与基础无障碍 | 用手机宽度检查页面；确保表单有 Label、按钮可聚焦、页面无明显横向溢出 | [MDN Web 学习区](https://developer.mozilla.org/zh-CN/docs/Learn_web_development) |
 
-| 技能 | 最小验收标准 |
-| --- | --- |
-| TypeScript strict | 使用 interface/type、联合类型、类型收窄，并避免滥用 any |
-| Vite + React 初始化 | 创建 React + TypeScript 项目并完成开发和生产构建 |
-| 组件、Props 与 State | 合理拆组件并完成父子数据和事件传递 |
-| Hooks 与副作用 | 正确使用 useState、useEffect、useRef 和自定义 Hook |
-| 路由与页面骨架 | 完成登录、列表、详情、设置等路由和统一 Layout |
-| Ant Design 企业后台 | 使用 Layout、Table、Form、Modal、Drawer、Tabs 完成管理页面 |
-| API 层与类型隔离 | 页面不散落 fetch；建立统一 API Client、类型和错误处理 |
-| 响应式验收 | 核心页面在桌面、平板、手机基本可用 |
+**阶段验收：** 能读懂普通 Web 页面结构，能借助 AI 做出布局合理、视觉一致、有完整状态的基础页面。
 
-## 8. Python、FastAPI 与数据库基础
+---
 
-| 技能 | 最小验收标准 |
-| --- | --- |
-| Python 工程环境 | 创建虚拟环境、安装锁定依赖、读取环境变量并运行程序 |
-| Python 数据处理 | 能处理列表、字典、JSON、YAML、文件和 HTTP API |
-| FastAPI 路由与 OpenAPI | 实现 GET / POST / PUT / DELETE，并理解自动 API Schema |
-| Pydantic 数据模型 | 请求、响应和配置有明确类型校验，不直接传任意 dict |
-| SQL 与 PostgreSQL | 掌握表、主键、外键、SELECT、JOIN 和 CRUD |
-| 基础分层 | 至少拆分 API、Schema、Service、Model / Repository，不把全部逻辑塞进路由 |
+## 第 3 阶段：React 前端工程（Day 21–30）
 
-## 9. 前后端第一次完整联调
+| Day | 难度 | 技能类型 | 今日技能 | 1 小时任务 / 验收 | 在线学习资源 |
+| ---: | --- | --- | --- | --- | --- |
+| 21 | L1 | TypeScript | TypeScript strict | 学会基础类型、interface/type、联合类型；项目开启 strict，不用 `any` 逃避错误 | [TypeScript 中文文档](https://www.typescriptlang.org/zh/docs/) |
+| 22 | L1 | React | Vite + React 初始化 | 创建 React + TypeScript + Vite 项目，能 `dev` 和 `build` | [Vite 中文指南](https://cn.vite.dev/guide/) |
+| 23 | L1 | React | 组件、Props、State | 拆出父组件和两个子组件，完成数据传递和按钮更新状态 | [React 中文快速入门](https://zh-hans.react.dev/learn) |
+| 24 | L1 | React | Hooks | 使用 `useState/useEffect/useRef` 完成搜索框和数据加载 | [React 中文文档](https://zh-hans.react.dev/learn) |
+| 25 | L1 | React | 路由与 Layout | 创建登录、列表、详情、设置四个路由和统一页面框架 | [React Router](https://reactrouter.com/home) |
+| 26 | L1 | 前端组件 | Ant Design | 用 Layout、Menu、Table、Form、Modal、Drawer 完成一个管理页面 | [Ant Design React 中文](https://ant.design/docs/react/introduce-cn/) |
+| 27 | L1 | 前端工程 | API Client 与类型 | 建立统一 `api/` 层，禁止页面散落 `fetch`；请求和响应都有 TS 类型 | [Bulletproof React](https://github.com/alan2207/bulletproof-react) |
+| 28 | L1 | 前端工程 | TanStack Query | 对列表请求实现 loading、error、缓存和刷新 | [TanStack Query](https://tanstack.com/query/latest/docs/framework/react/overview) |
+| 29 | L1 | 前端工程 | 表单校验 | 使用 React Hook Form + Zod 完成一个带必填、格式和错误提示的表单 | [React Hook Form](https://react-hook-form.com/) / [Zod](https://zod.dev/) |
+| 30 | L1 | 前端质量 | Build + E2E + 视觉验收 | `lint/build` 全通过；用浏览器完整走一遍新增、编辑、删除流程并截图验收 | [Playwright 官方](https://playwright.dev/docs/intro) |
 
-| 技能 | 最小验收标准 |
-| --- | --- |
-| 先设计再编码 | 编码前产出页面清单、核心数据模型、API URL / Method / Request / Response |
-| 契约优先 | 前后端按照 OpenAPI / JSON Schema 约定字段，禁止两端各自猜接口 |
-| 完整 CRUD | 列表、详情、新增、编辑、删除、搜索、分页和错误处理端到端跑通 |
-| 页面完整状态 | 至少具备 Loading、Empty、Error、Success 状态 |
-| 表单交互与反馈 | 必填、校验、提交中、成功、失败和危险操作确认清晰 |
-| PR / MR | 能提交可审查变更，写清改动、验证结果和已知风险 |
+**阶段验收：** 能在 AI 辅助下独立产出一个结构清晰、美观、可构建的 React 企业后台页面，而不是只会生成静态 Demo。
 
-### L1 里程碑：第一个完整全栈项目
+---
 
-至少独立完成一次：
+## 第 4 阶段：Python、FastAPI 与数据库（Day 31–40）
+
+| Day | 难度 | 技能类型 | 今日技能 | 1 小时任务 / 验收 | 在线学习资源 |
+| ---: | --- | --- | --- | --- | --- |
+| 31 | L1 | Python | Python 环境与依赖 | 建立虚拟环境、安装依赖、读取环境变量，能解释 requirements/pyproject 的作用 | [Python 官方中文教程](https://docs.python.org/zh-cn/3/tutorial/) |
+| 32 | L1 | Python | 数据结构、文件和 JSON | 读取 JSON 文件，处理列表/字典并输出新文件 | [Python 官方中文教程](https://docs.python.org/zh-cn/3/tutorial/) |
+| 33 | L1 | Python | HTTP API 与异常 | 调用一个 HTTP API，加入 timeout、异常捕获和日志 | [Requests 中文文档](https://requests.readthedocs.io/projects/cn/zh-cn/latest/) |
+| 34 | L1 | FastAPI | 路由与 OpenAPI | 创建 `GET/POST/PUT/DELETE` 四类接口并打开 `/docs` 查看 Schema | [FastAPI 中文教程](https://fastapi.tiangolo.com/zh/tutorial/) |
+| 35 | L1 | FastAPI | Pydantic 模型 | 为请求、响应和配置建立模型，让非法参数返回明确错误 | [FastAPI 中文教程](https://fastapi.tiangolo.com/zh/tutorial/) |
+| 36 | L1 | 后端架构 | 分层与依赖注入 | 把路由、业务逻辑、数据访问拆开，至少形成 `api/service/repository` | [FastAPI 中文教程](https://fastapi.tiangolo.com/zh/tutorial/) |
+| 37 | L1 | 数据库 | SQL / PostgreSQL | 创建两张有关联的表，完成 Insert、Select、Join、Update、Delete | [PostgreSQL 中文教程](https://postgresql.ac.cn/docs/current/tutorial.html) |
+| 38 | L2 | 数据库 | ORM 与 Migration | 使用 SQLAlchemy/SQLModel 建模，并完成一次 Alembic Migration | [SQLModel](https://sqlmodel.tiangolo.com/) / [Alembic](https://alembic.sqlalchemy.org/) |
+| 39 | L2 | 后端安全 | 登录、认证与 RBAC | 实现一个登录接口和两种角色；验证无权限请求被服务端拒绝 | [FastAPI 安全教程](https://fastapi.tiangolo.com/zh/tutorial/security/) |
+| 40 | L2 | 后端质量 | 错误、日志、Request ID、pytest | 统一错误结构；为一个 Service 和一个 API 写测试并通过 | [pytest 中文站](https://pytest.cn/en/stable/getting-started.html) |
+
+**阶段验收：** 能在 AI 辅助下完成真实数据库 CRUD API，具备类型校验、分层、权限、日志和基础测试。
+
+---
+
+## 第 5 阶段：全栈稳定交付（Day 41–50）
+
+| Day | 难度 | 技能类型 | 今日技能 | 1 小时任务 / 验收 | 在线学习资源 |
+| ---: | --- | --- | --- | --- | --- |
+| 41 | L2 | 全栈 | API 契约优先 | 开发前先固定一个功能的 URL、Method、Request/Response Schema，前后端都按契约实现 | [FastAPI OpenAPI](https://fastapi.tiangolo.com/zh/how-to/extending-openapi/) |
+| 42 | L2 | 全栈 | CRUD 端到端 | 打通 React → FastAPI → PostgreSQL 的列表、新增、编辑、删除 | [FastAPI Full Stack Template](https://github.com/fastapi/full-stack-fastapi-template) |
+| 43 | L2 | 全栈 | 登录权限端到端 | 验证 Login → Session/Token → API → 401/403 → Logout 全流程 | [FastAPI 安全教程](https://fastapi.tiangolo.com/zh/tutorial/security/) |
+| 44 | L2 | 全栈 | 文件与长任务 | 完成一次上传/下载；理解耗时任务为什么不能阻塞普通 HTTP 请求 | [FastAPI 文件上传](https://fastapi.tiangolo.com/zh/tutorial/request-files/) |
+| 45 | L2 | Docker | 镜像基础 | 为前端或后端写 Dockerfile，构建并启动容器 | [Docker 从入门到实践](https://docker-practice.github.io/zh-cn/) |
+| 46 | L2 | Docker | Docker Compose | 前端、后端、PostgreSQL 一条命令启动，并验证数据持久化 | [Docker 从入门到实践](https://docker-practice.github.io/zh-cn/) |
+| 47 | L2 | CI/CD | GitHub Actions CI | Push/PR 自动执行 lint、test、build，制造一次失败确认 Gate 生效 | [GitHub Actions 中文文档](https://docs.github.com/zh/actions) |
+| 48 | L2 | 可运维性 | 健康检查与可观测性 | 增加 `/healthz`；日志能定位请求，至少能看到失败原因和耗时 | [OpenTelemetry 中文文档](https://opentelemetry.io/zh/docs/) |
+| 49 | L2 | 交付 | 备份、恢复和回滚 | 写一页 Runbook：部署、升级、数据库备份、恢复、Git/Docker 回滚 | [Docker 从入门到实践](https://docker-practice.github.io/zh-cn/) |
+| 50 | L2 | 综合验收 | 完整项目验收 | 从新环境按 README 启动项目，跑测试、构建、登录和一条核心业务流程；全部通过才算完成 | [Zwiki：Vibe Coding](vibe-coding.md) |
+
+**阶段验收：** 项目不再只是“我电脑能跑”，而是别人可按文档启动、验证、升级和回退。
+
+---
+
+## 第 6 阶段：Agent 与 FDE 高级能力（Day 51–60）
+
+| Day | 难度 | 技能类型 | 今日技能 | 1 小时任务 / 验收 | 在线学习资源 |
+| ---: | --- | --- | --- | --- | --- |
+| 51 | L2 | LLM API | OpenAI API / Responses | 后端完成一次模型调用，并使用环境变量管理 Key；处理超时和失败 | [OpenAI API Quickstart](https://developers.openai.com/api/docs/quickstart) |
+| 52 | L2 | Agent | Tool Calling / 结构化输出 | 定义一个工具 Schema，让模型正确调用工具并返回结构化结果 | [OpenAI Agents SDK 简中](https://openai.github.io/openai-agents-python/zh/) |
+| 53 | L2 | Agent | Agents SDK | 创建一个最小 Agent，包含 instructions、tool 和 session/context | [OpenAI Agents SDK 简中](https://openai.github.io/openai-agents-python/zh/) |
+| 54 | L2 | Agent | MCP | 连接一个受信任 MCP Server，列出工具并成功调用一次；说明最小权限原则 | [Agents SDK MCP 简中](https://openai.github.io/openai-agents-python/zh/mcp/) |
+| 55 | L2 | Agent | RAG / 文件检索 | 导入几份资料，回答一个问题并给出可追溯来源；人工检查引用是否支持结论 | [OpenAI Cookbook](https://github.com/openai/openai-cookbook) |
+| 56 | L3 | Agent 质量 | Evals、Tracing、Guardrails | 建 5 条固定测试问题，记录成功/失败；查看一次 Trace；为高风险 Tool 增加审批或校验 | [OpenAI Agents SDK 简中](https://openai.github.io/openai-agents-python/zh/) |
+| 57 | L2 | Go / 现场服务 | Go + Gin | 创建最小 Gin `/ping` 服务，理解 Module、struct、error，并构建二进制 | [Gin 中文快速入门](https://gin-gonic.com/zh-cn/docs/quickstart/) |
+| 58 | L3 | Go / 现场服务 | GORM + 单文件交付 | 用 GORM 做最小 CRUD；交叉编译一个 Linux/Windows 目标二进制并启动验证 | [GORM 中文文档](https://gorm.io/zh_CN/docs/index.html) |
+| 59 | L3 | FDE | Discovery、Scoping、System Design | 选择一个真实业务场景，写：现状工作流、痛点、成功指标、范围/非范围、架构图、风险、分阶段交付计划 | [OpenAI FDE](https://openai.com/careers/forward-deployed-engineer-%28fde%29-seattle-seattle/) |
+| 60 | L3 | FDE | Prototype → Production → Adoption → Handoff | 为 Day 59 场景写一页交付方案：Prototype 验收、生产上线条件、采用指标、Eval 反馈、回退、客户交接、可复用 Playbook | [OpenAI FDSWE](https://openai.com/careers/forward-deployed-software-engineer-seattle-seattle/) |
+
+**阶段验收：** 不只会调用模型，而是开始理解如何把 AI 系统安全地放进真实工作流，并能从客户问题一路推进到生产、验收和交接。
+
+---
+
+## 60 天完成后应该达到什么程度
+
+完成全部 60 天，至少应能独立完成一次以下闭环：
 
 ```text
-需求规格
-→ 页面与 API 设计
-→ React + TypeScript + Ant Design
-→ FastAPI + Pydantic
+客户 / 用户问题
+→ 需求与成功标准
+→ 技术范围与架构
+→ React 前端
+→ FastAPI 后端
 → PostgreSQL
-→ CRUD 联调
-→ Git PR/MR
-→ 浏览器真实验收
+→ Git / PR
+→ 自动测试与 CI
+→ Docker Compose
+→ Agent / Tool / RAG（需要时）
+→ 实际验收
+→ 部署与回滚
+→ README / Runbook / Handoff
 ```
 
-**L1 不是“能让 AI 生成代码”，而是“能让 AI 生成后自己判断、修改和验收”。**
+如果其中任何一步仍只能“让 AI 自己决定并相信它”，就说明对应技能还没有过关，应返回那一天重复练习。
 
----
+这 60 小时的目标是**熟悉 FDE 必备技能和正确工作方式**，不是达到高级工程师熟练度。OpenAI FDE 当前招聘中要求的多年工程、客户现场和生产交付经验，仍然需要通过真实项目长期积累。
 
-# L2 中级：从“能做”升级到“能稳定交付”
+## 推荐长期循环
 
-## 10. 前端工程化
+60 天后不再继续无限增加课程，而是反复做真实小项目：
 
-| 技能 | 最小验收标准 |
-| --- | --- |
-| Design Tokens 与统一视觉规范 | 统一颜色、字号、间距、圆角、阴影和状态语义 |
-| TanStack Query | 使用 Query / Mutation 管理缓存、分页、重试、刷新和服务端状态 |
-| React Hook Form + Zod | 复杂表单使用统一 Schema 校验，不把规则散落到组件 |
-| Tailwind + shadcn/ui | 产品型 UI 需要自由视觉时使用；与 Ant Design 不无原则混搭 |
-| 图标与数据可视化 | 图标风格统一；复杂业务图表使用 ECharts 等成熟组件 |
-| 无障碍与键盘操作 | 关键操作可键盘完成，表单有 Label / ARIA |
-| AI 视觉验收 | 用截图或 Playwright 检查布局、间距、字体、颜色和响应式 |
-| 前端自动测试 | 核心逻辑有单测，关键用户路径至少一条 Playwright E2E |
+1. 每个项目都执行 `需求 → Gate → 实现 → Verify → 交付`。
+2. 每次项目只补当前暴露出来的短板。
+3. 优先增加真实用户、真实数据库、真实部署和真实故障场景。
+4. 把成功方案沉淀为模板、脚手架、Skill、Runbook 或 Playbook。
 
-## 11. 后端生产工程
+这比继续刷更多框架，更接近 OpenAI FDE 所要求的“从现场问题到生产系统，再把经验反哺产品和可复用工程资产”的能力模型。
 
-| 技能 | 最小验收标准 |
-| --- | --- |
-| SQLAlchemy / SQLModel | 设计模型、Session、关系、查询和事务边界 |
-| Alembic 数据库迁移 | Schema 变更可重复执行、可追踪，并具备回退方案 |
-| 认证与 RBAC | 登录、身份认证、角色和服务端权限检查完整 |
-| 统一错误模型 | 客户端得到稳定错误结构，不靠解析随机字符串判断失败 |
-| 日志与 Request ID | 一次请求可以关联前后端和后端日志，且日志不泄露 Secret |
-| 后端自动测试 | Service、API、权限和数据库关键路径具备 pytest 测试 |
-| 超时、重试与幂等基础 | 外部调用有超时，重试不会重复创建资源或放大故障 |
+## 主要依据
 
-## 12. 稳定交付与生产基础
-
-| 技能 | 最小验收标准 |
-| --- | --- |
-| CI 质量门禁 | PR 后自动运行 lint、typecheck、test、build，失败不能合并 |
-| 依赖与锁文件治理 | 锁文件提交；升级依赖前查看变化并执行回归测试 |
-| 类型化前端客户端 | 前端接口类型从 OpenAPI 生成或集中维护，避免前后端漂移 |
-| 登录与权限端到端 | 登录 → 会话 → API 鉴权 → 401/403 → 退出完整验证 |
-| 上传、下载和长任务 | 正确处理文件、进度、超时、取消和后台任务 |
-| Docker Compose 全栈启动 | Frontend、Backend、DB 等服务可以一条命令启动 |
-| 性能与体验检查 | 避免重复请求、无意义重渲染和过大 Bundle，关注核心接口耗时 |
-| 健康检查 | 服务有 health/readiness 检查，并能在异常时快速定位依赖故障 |
-| 部署、备份和回滚 Runbook | 陌生同事可按文档完成部署、升级、备份、恢复和回滚 |
-
-## 13. 从工程师向 FDE 过渡
-
-OpenAI FDE 岗位要求的不只是代码质量，L2 开始必须加入交付和客户视角。
-
-| 技能 | 最小验收标准 |
-| --- | --- |
-| 技术 Discovery 基础 | 能把业务描述转成用户流程、数据源、限制条件和待验证假设 |
-| Scope 与项目计划 | 能拆 MVP / POC / Production 范围，明确依赖、里程碑和验收标准 |
-| 交付排序与阻塞管理 | 先解决关键路径和最大不确定性，不把所有功能同时铺开 |
-| Scope / Speed / Quality 权衡 | 能说明为什么某项现在做、以后做或不做，并记录风险 |
-| 客户沟通与验收 | 能用简洁文档说明问题、方案、进度、风险和实际验证结果 |
-| 基本业务效果指标 | 不只看“服务运行”，还定义用户采用、任务完成或效率改善指标 |
-
-### L2 里程碑：稳定生产交付
-
-至少完成一个可让其他人接手的项目，具备：
-
-- 类型约束；
-- 权限与 Secret 管理；
-- 自动测试；
-- CI；
-- Docker Compose；
-- 日志和错误处理；
-- 健康检查；
-- README / Runbook；
-- Git 回退点；
-- 明确验收标准；
-- 至少一次真实用户或业务流程验证。
-
----
-
-# L3 高级：对标 OpenAI FDE 的端到端交付能力
-
-## 14. LLM、Agent 与评估体系
-
-| 技能 | 最小验收标准 |
-| --- | --- |
-| Responses API | 后端安全调用模型，支持结构化输出、错误处理和流式响应 |
-| Agents SDK 与 Tool Calling | 定义 Agent、工具 Schema、执行边界和工具结果回传 |
-| MCP 工具接入 | 理解 Client / Server / Tool，并连接真实 MCP Server |
-| 文件检索 / RAG | 导入文档、检索相关内容，并返回可追溯引用 |
-| Agent Evals | 使用代表性测试集评估答案质量、工具选择和版本回归 |
-| 客户验收 Benchmark | 把客户业务目标转成可重复执行的 acceptance criteria 和 launch threshold |
-| Guardrails 与权限边界 | 高风险工具有参数校验、最小权限、拒绝策略和必要人工确认 |
-| Human-in-the-loop | 明确哪些结果必须人工审阅，设计 review、escalation 和恢复路径 |
-| Tracing 与错误分析 | 查看模型、工具、耗时、异常和上下文链路，并用错误样本驱动改进 |
-| 高质量 Agent WebUI | 展示流式文本、工具调用、引用、结构化结果、取消和错误状态 |
-| 模型行为与产品体验 | 能识别幻觉、延迟、非确定性和工具失败对用户信任及流程的影响 |
-
-## 15. FDE 端到端客户交付
-
-这部分直接对应 OpenAI 当前 FDE 招聘描述中的核心职责。
-
-| 技能 | 最小验收标准 |
-| --- | --- |
-| 深度 Discovery | 与工程师、业务和领域专家一起还原真实 workflow，而不是只接收功能清单 |
-| Technical Scoping | 把模糊问题转成清晰范围、技术约束、成功标准和实施顺序 |
-| System Design | 设计前端、后端、数据、模型、外部 API、Agent Tool、权限和故障边界 |
-| Prototype → Production | 能从“验证想法”推进到稳定生产，而不是停留在 Demo |
-| Experiment-driven Iteration | 先验证最大风险假设，通过实验和指标决定下一轮实现，而非一次做完 |
-| Production Adoption | 关注用户是否真实使用、工作流是否改善，而不仅是部署成功 |
-| Measurable Workflow Impact | 为目标流程定义质量、效率、采用率或业务影响指标 |
-| Eval-driven Feedback Loop | 用评估结果、错误分析、观测和用户反馈决定模型、提示词、工具或流程优化 |
-| 风险识别与计划调整 | 提前识别性能、数据、权限、合规、范围和客户依赖风险并调整交付计划 |
-| 复杂环境判断 | 在需求模糊、时间紧、信息不完整时仍能做可解释、可回退的技术决策 |
-| Hands-on Coding | 关键路径卡住时能直接修改生产级前端、后端或集成代码，而不是只做协调 |
-| 客户基础设施集成 | 能与企业 API、数据平台、身份系统、网络和现有工作流集成 |
-| Handoff 与知识转移 | 客户或内部团队可依据文档、Runbook、测试和架构说明继续维护 |
-
-## 16. 安全、治理与受监管场景
-
-OpenAI 医疗、法律和政府类 FDE 岗位进一步强调这些能力。通用 FDE 不一定每天全部用到，但高风险客户交付需要掌握。
-
-| 技能 | 最小验收标准 |
-| --- | --- |
-| Privacy by Design | 明确数据分类、最小数据使用、保留周期和敏感数据处理边界 |
-| Authentication / Authorization | 身份、角色、服务间权限和高风险操作权限清晰 |
-| Auditability | 关键用户、模型和工具操作有可追溯记录 |
-| Security Review | 上线前检查 Secret、依赖、网络暴露、输入边界和工具权限 |
-| Governance | 明确模型、数据、工具的允许用途、责任人和变更流程 |
-| Launch Criteria | 在上线前定义质量、安全、性能和人工审核通过条件 |
-| Escalation Path | 模型或工具失败时有明确的人工升级、暂停和恢复路径 |
-
-## 17. 可复用工程与组织影响力
-
-OpenAI FDE 还要求把一次客户成功变成可以扩展到更多客户的能力。
-
-| 技能 | 最小验收标准 |
-| --- | --- |
-| Playbook 沉淀 | 把发现问题、部署、排错、上线和回滚整理成可重复流程 |
-| Reference Architecture | 从多个项目提炼稳定架构，而不是复制某客户的临时代码 |
-| Reusable Building Blocks | 把通用工具、组件、集成和测试封装成可复用模块 |
-| 内部知识库维护 | 关键问题、限制、经验和失败案例可被其他工程师搜索复用 |
-| Field → Product / Research Feedback | 把客户现场结果转成清晰、可复现、可行动的产品或模型反馈 |
-| 跨团队协作 | 能与 Product、Research、Security、GRC、Sales/GTM 等团队围绕同一交付目标协作 |
-
-## 18. Go 与客户现场单文件服务
-
-Go 不是 Web 全栈的第一学习后端，而是 FDE 在客户机、离线环境和低依赖部署中的补充能力。
-
-| 技能 | 最小验收标准 |
-| --- | --- |
-| Go 基础与 Module | 建立 go.mod，理解 struct、interface、error 和包结构 |
-| Gin REST 服务 | 完成路由、JSON 校验、中间件、日志和基本测试 |
-| GORM 数据访问 | 连接数据库并完成模型、迁移和 CRUD |
-| 交叉编译单文件交付 | 构建 Linux / Windows 目标产物，并在真实目标机启动验证 |
-
-### L3 里程碑：模拟一次完整 FDE 交付
-
-项目至少经历：
-
-```text
-客户问题发现
-→ Workflow / 数据 / 约束梳理
-→ Scope 与 POC 成功标准
-→ 系统设计
-→ 全栈 Prototype
-→ LLM / Agent / Tool 集成
-→ Evals + 人工 Review
-→ Production Hardening
-→ 部署
-→ Adoption / Workflow Impact 验证
-→ Handoff
-→ Playbook / Reusable Component / Field Feedback
-```
-
-这比“做出一个 Agent Demo”更接近 OpenAI 当前 FDE 的实际岗位要求。
-
-## 19. OpenAI 招聘要求与技能路线映射
-
-| OpenAI 官方要求 | 本路线位置 |
-| --- | --- |
-| Discovery、Technical Scoping | L2 技术 Discovery；L3 深度 Discovery / Technical Scoping |
-| System Design、Build、Production Rollout | L1 全栈基础 → L2 稳定交付 → L3 Prototype → Production |
-| Production-grade frontend / backend | L1 React + FastAPI；L2 测试、权限、CI、部署 |
-| LLM / Generative AI systems | L3 LLM、Agent 与评估体系 |
-| Scope / Speed / Quality trade-offs | L2 Scope 与项目计划；L3 风险识别和复杂环境判断 |
-| Customer-facing ownership | L2 客户沟通；L3 端到端客户交付 |
-| Production adoption / measurable workflow impact | L3 Production Adoption / Workflow Impact |
-| Eval-driven feedback | L3 Evals、Benchmark、Tracing、Feedback Loop |
-| Guardrails / Security / Governance | L3 安全、治理与受监管场景 |
-| Codify patterns into tools / playbooks | L3 可复用工程与组织影响力 |
-| Field feedback to Product / Research | L3 Field → Product / Research Feedback |
-| 5+ 年工程或部署经验 | 工作经验门槛，不能用学习清单替代 |
-
-## 20. 官方来源
-
-以下页面均来自 OpenAI Careers，岗位内容会随招聘调整，复核时以当前官网为准：
-
-- [Forward Deployed Engineer (FDE) - SF](https://openai.com/careers/forward-deployed-engineer-%28fde%29-sf-san-francisco/)
-- [Forward Deployed Engineer - Tokyo](https://openai.com/careers/forward-deployed-engineer-tokyo-tokyo-japan/)
-- [Forward Deployed Engineer, Gov](https://openai.com/careers/forward-deployed-engineer-gov-washington-dc/)
-- [Forward Deployed Software Engineer - Seattle](https://openai.com/careers/forward-deployed-software-engineer-seattle-seattle/)
-- [Forward Deployed Engineer (FDE), Healthcare - SF](https://openai.com/careers/forward-deployed-engineer-%28fde%29-healthcare-sf-san-francisco/)
-- [Forward Deployed Engineer (FDE), Legal-SF](https://openai.com/careers/forward-deployed-engineer-%28fde%29-legal-sf-new-york-city/)
-- [OpenAI Careers - Forward Deployed 搜索](https://openai.com/careers/search/?q=forward+deployed)
-
-## 相关文档
-
+- [OpenAI Forward Deployed Engineer - Seattle](https://openai.com/careers/forward-deployed-engineer-%28fde%29-seattle-seattle/)
+- [OpenAI Forward Deployed Software Engineer - Seattle](https://openai.com/careers/forward-deployed-software-engineer-seattle-seattle/)
+- [OpenAI FDE Healthcare](https://openai.com/careers/forward-deployed-engineer-%28fde%29-healthcare-sf-san-francisco/)
 - [Vibe Coding](vibe-coding.md)
 - [Codex 项目开局规范](codex-project-bootstrap.md)
-- [ChatGPT 与 Codex](chatgpt-codex.md)
-- [AI 资源](../resources.md)
 - [开发 / 技术栈与工具](../../development/tooling/README.md)
