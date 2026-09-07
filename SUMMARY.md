@@ -23,6 +23,7 @@
 
 * [AI](ai/README.md)
   * [AI Coding](ai/coding/README.md)
+    * [FDE 技能路线图](ai/coding/fde-skills-roadmap.md)
     * [ChatGPT 与 Codex](ai/coding/chatgpt-codex.md)
     * [Vibe Coding](ai/coding/vibe-coding.md)
     * [Codex 项目开局规范](ai/coding/codex-project-bootstrap.md)
