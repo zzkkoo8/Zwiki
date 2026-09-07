@@ -2,6 +2,10 @@
 
 记录 K3s 发行版特有的安装、配置、集群运维和故障恢复文章。
 
+## 部署手册
+
+- [产品运行底座：K3s 集群部署手册](product-runtime-k3s-deployment.md)：面向产品集群版底座，覆盖部署前硬件/OS/网络/数据盘检查、chroot + Ansible、安装参数和安装后验收。
+
 ## 收录范围
 
 - Server、Agent 安装与节点加入
