@@ -204,7 +204,7 @@ dmesg -T | tail -n 100
 
 ## 5. SSH 开启 root 登录
 
-Ubuntu 22.04 使用 OpenSSH 时，推荐通过独立 drop-in 配置，不直接反复修改发行版默认文件。
+Ubuntu 22.04 使用 OpenSSH 时，推荐通过独立 drop-in 配置，不直接反复修改发行版默认文件。Ubuntu 的 SSH 配置可能已经存在 `50-cloud-init.conf` 等文件，因此这里使用排序靠前的 `00-zwiki-root-login.conf`，并始终通过 `sshd -T` 验证最终有效配置。
 
 ### 临时允许 root 密码登录
 
@@ -218,7 +218,7 @@ sudo passwd root
 
 ```bash
 sudo mkdir -p /etc/ssh/sshd_config.d
-printf 'PermitRootLogin yes\nPasswordAuthentication yes\n' | sudo tee /etc/ssh/sshd_config.d/99-root-login.conf
+printf 'PermitRootLogin yes\nPasswordAuthentication yes\n' | sudo tee /etc/ssh/sshd_config.d/00-zwiki-root-login.conf
 ```
 
 检查配置：
@@ -251,7 +251,7 @@ passwordauthentication yes
 ### root 改为仅允许密钥登录
 
 ```bash
-printf 'PermitRootLogin prohibit-password\nPubkeyAuthentication yes\nPasswordAuthentication yes\n' | sudo tee /etc/ssh/sshd_config.d/99-root-login.conf
+printf 'PermitRootLogin prohibit-password\nPubkeyAuthentication yes\nPasswordAuthentication yes\n' | sudo tee /etc/ssh/sshd_config.d/00-zwiki-root-login.conf
 sudo sshd -t && sudo systemctl reload ssh
 ```
 
@@ -281,10 +281,10 @@ ssh-keygen -t ed25519
 
 ### macOS 原生命令，一行写入 Linux
 
-macOS 不依赖 `ssh-copy-id`，直接使用系统自带的 `ssh`：
+macOS 不依赖 `ssh-copy-id`，直接使用系统自带的 `ssh`。下面命令重复执行也不会重复写入相同公钥：
 
 ```bash
-cat ~/.ssh/id_ed25519.pub | ssh root@192.168.1.100 'umask 077; mkdir -p ~/.ssh; touch ~/.ssh/authorized_keys; cat >> ~/.ssh/authorized_keys; chmod 700 ~/.ssh; chmod 600 ~/.ssh/authorized_keys'
+cat ~/.ssh/id_ed25519.pub | ssh root@192.168.1.100 'umask 077; mkdir -p ~/.ssh; touch ~/.ssh/authorized_keys; IFS= read -r key; grep -qxF "$key" ~/.ssh/authorized_keys || printf "%s\n" "$key" >> ~/.ssh/authorized_keys; chmod 700 ~/.ssh; chmod 600 ~/.ssh/authorized_keys'
 ```
 
 首次会要求输入一次 Linux root 密码。
@@ -300,7 +300,7 @@ ssh root@192.168.1.100
 如果希望从“无密钥”到“完成下发”一条命令执行：
 
 ```bash
-test -f ~/.ssh/id_ed25519.pub || ssh-keygen -q -t ed25519 -N '' -f ~/.ssh/id_ed25519; cat ~/.ssh/id_ed25519.pub | ssh root@192.168.1.100 'umask 077; mkdir -p ~/.ssh; touch ~/.ssh/authorized_keys; cat >> ~/.ssh/authorized_keys; chmod 700 ~/.ssh; chmod 600 ~/.ssh/authorized_keys'
+test -f ~/.ssh/id_ed25519.pub || ssh-keygen -q -t ed25519 -N '' -f ~/.ssh/id_ed25519; cat ~/.ssh/id_ed25519.pub | ssh root@192.168.1.100 'umask 077; mkdir -p ~/.ssh; touch ~/.ssh/authorized_keys; IFS= read -r key; grep -qxF "$key" ~/.ssh/authorized_keys || printf "%s\n" "$key" >> ~/.ssh/authorized_keys; chmod 700 ~/.ssh; chmod 600 ~/.ssh/authorized_keys'
 ```
 
 > 建议先确认公钥登录成功，再把 root SSH 策略改成 `PermitRootLogin prohibit-password`。
