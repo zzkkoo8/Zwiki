@@ -20,38 +20,56 @@
 
 安装前先完成本表。任意关键项失败时，先修当前项，不继续后续安装。修正后直接重新执行“检查 / 验证命令”。
 
+**命令规范：**
+
+- 表中的检查命令均可直接复制到 Bash 终端执行。
+- 需要现场 IP、域名或文件路径时，命令会先通过 `read` 交互式询问，不再使用 `<server-ip>`、`<测试域名>` 这类无法直接执行的占位符。
+- 修正操作如果不存在跨发行版、跨环境都安全的一键命令，会明确写为“无安全通用命令”，不为了凑命令加入高风险操作。
+- 部署前 K3s 服务尚未启动，因此**不能用 `nc` 连接 6443、2379、2380、10250 是否成功来判断新集群网络是否合格**。部署前只检查节点基础互通、主机端口冲突和外部 ACL / 防火墙策略；服务端口连通性放到安装后验收。
+
 | 检查项 | 检查 / 验证命令 | 正常反馈 / 判定 | 修正命令 / 处理 |
 | --- | --- | --- | --- |
-| CPU 架构 | `uname -m` | `x86_64` 或 `aarch64/arm64`，且与安装包一致 | **无安全通用修改命令**；更换匹配架构的安装介质 |
-| 内核 / OS | `uname -r; cat /etc/os-release` | 满足当前产品版本支持列表 | **无通用修改命令**；更换受支持 OS/Kernel |
-| ARM `lrcpc` | `lscpu \| grep -iw lrcpc` | 当前产品要求 ARM `lrcpc` 时必须有输出 | **无软件修正命令**；更换兼容 CPU/平台 |
-| Page Size | `getconf PAGE_SIZE` | 标准路径通常为 `4096`；`65536` 必须走 64K 专项兼容流程 | **禁止强改**；按产品 64K Page Size 专项方案处理 |
-| 主机名 | `hostname; hostnamectl status` | 所有节点唯一，仅建议 `[a-z0-9-]` | `hostnamectl set-hostname <new-name>` |
-| DNS | `cat /etc/resolv.conf; getent hosts <测试域名>` | nameserver 有效且解析成功 | 按系统网络规范修正 DNS 配置；NetworkManager 环境可用 `nmcli con mod <连接名> ipv4.dns '<dns-ip>'` 后重新激活连接 |
-| 时间 / NTP | `timedatectl; chronyc tracking 2>/dev/null || true` | 时区一致；`System clock synchronized: yes` 或 chrony 等价同步状态 | `timedatectl set-ntp true`；chrony 环境：`systemctl restart chronyd` |
-| Swap | `swapon --show; grep -Ev '^\s*#|^\s*$' /etc/fstab \| grep -i swap` | 无启用中的 swap | 临时：`swapoff -a`；持久化需人工修正 `/etc/fstab`，不要用未知脚本批量改 |
-| firewalld | `systemctl is-active firewalld 2>/dev/null || true` | 按产品 SOP 应为 `inactive` | 经变更批准后：`systemctl disable --now firewalld` |
-| ufw | `ufw status 2>/dev/null || true` | 按产品 SOP 应为 `Status: inactive` | 经变更批准后：`ufw disable` |
-| SELinux | `getenforce 2>/dev/null || true` | 按产品 SOP 应为 `Disabled` | **不提供一键改命令**；按发行版规范修改 SELinux 配置并在维护窗口重启 |
-| `/var` 空间 | `df -hT /var` | `/var` 空间满足当前产品资源规划 | 优先扩容；不要直接执行 `rm -rf` 清理未知目录 |
-| inode | `df -ih / /var /var/lib/rancher/k3s` | inode 未接近耗尽 | 先定位大量小文件：`du --inodes -x -d1 /var 2>/dev/null \| sort -n`；仅删除人工确认无用文件 |
-| K3s 数据盘 | `findmnt -T /var/lib/rancher/k3s; lsblk -f` | 数据目录位于规划的独立真实磁盘 / LV | 若设备和 `/etc/fstab` 已确认正确且只是未挂载：`mount /var/lib/rancher/k3s`；否则按磁盘规划处理 |
-| 禁止软链接 | `test -L /var/lib/rancher/k3s && echo FAIL || echo PASS` | 输出 `PASS` | **禁止直接搬迁数据**；按维护流程迁移到真实挂载点 |
-| 文件系统 / Quota | `findmnt -no SOURCE,FSTYPE,OPTIONS /var/lib/rancher/k3s` | 文件系统及 `prjquota` 等参数符合当前产品规划 | **无通用安全修改命令**；需要卸载/重建文件系统时必须进入维护窗口并确认备份 |
-| 磁盘 I/O | 按当前产品批准的 `fio` 测试脚本执行 | 达到资源计算器 / 项目审批阈值 | 性能不足时更换/扩容存储；禁止对有数据的系统盘直接做破坏性裸盘测试 |
-| SSH | `ssh root@<node> true` | 部署节点可无交互登录所有目标节点 | 配置 SSH key / known_hosts；例如 `ssh-copy-id root@<node>` |
-| 节点互通 | `ping -c 3 <peer-ip>; nc -zvw3 <server-ip> 6443` | 网络可达，K3s API 端口可达 | 修正路由、ACL、安全组或防火墙策略 |
-| K3s 关键端口 | `nc -zvw3 <server-ip> 6443; nc -zvw3 <server-ip> 2379; nc -zvw3 <peer-ip> 10250` | 按实际角色和网络模式对应端口可达 | 修正 ACL / 防火墙；VXLAN 模式还需确认 UDP/8472 |
-| Master / Server 数量 | 人工核对 inventory / `default.ini` | embedded etcd HA 至少 3 个 Server，使用奇数个 | 调整规划；**不要通过临时删除 Server 凑奇数** |
+| CPU 架构 | `uname -m` | 产品支持的 x86_64 主机应输出 `x86_64`；ARM64 主机通常输出 `aarch64`。必须与安装介质架构一致 | **无安全通用修改命令**。更换与 CPU 架构匹配的安装介质 |
+| CPU / 内存 | `nproc; free -h` | 不低于当前产品版本的资源规划；裸 K3s 官方最低值仅作为底座基线，不能替代产品资源要求 | **无软件修正命令**。扩容 CPU / 内存或调整节点规格 |
+| 内核 / OS | `uname -r; cat /etc/os-release` | Linux 内核和发行版必须位于当前产品版本支持范围内 | **无安全通用修改命令**。升级或更换受支持的 OS / Kernel，完成后重新检查 |
+| cgroup | `mountpoint -q /sys/fs/cgroup && echo 'PASS: cgroup 已挂载' || echo 'FAIL: cgroup 未挂载'; stat -fc %T /sys/fs/cgroup` | 输出 `PASS`；并能识别 cgroup 文件系统。K3s 依赖可用的 cgroup | **无跨发行版通用修正命令**。按当前 OS 的 cgroup 配置方式处理后重启并复查 |
+| ARM `lrcpc` | `if [ "$(uname -m)" = "aarch64" ]; then grep -qw lrcpc /proc/cpuinfo && echo 'PASS: lrcpc' || echo 'FAIL: 缺少 lrcpc'; else echo 'SKIP: 非 ARM64'; fi` | x86_64 输出 `SKIP`；当前产品要求 `lrcpc` 的 ARM64 节点必须输出 `PASS` | **无软件修正命令**。CPU 不具备该特性时更换兼容硬件或确认当前产品版本的兼容方案 |
+| Page Size | `getconf PAGESIZE` | 标准路径通常为 `4096`；若输出 `65536`，必须确认当前产品版本的 64 KiB Page Size 专项兼容要求 | **禁止通过系统参数强改 Page Size**。按产品专项兼容方案处理 |
+| 主机名 | `hostname; h=$(hostname); [[ "$h" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]] && echo 'PASS: hostname 格式正确' || echo 'FAIL: hostname 格式错误'` | 主机名唯一；按产品命名规范使用小写字母、数字和 `-`；格式检查输出 `PASS` | `read -rp '输入新主机名: ' NEW_HOSTNAME; [[ "$NEW_HOSTNAME" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]] && hostnamectl set-hostname "$NEW_HOSTNAME" || echo 'ERROR: 主机名格式不合法'` |
+| DNS | `grep -E '^nameserver[[:space:]]+' /etc/resolv.conf || echo 'FAIL: 未配置 nameserver'; read -rp '输入环境中应可解析的域名: ' TEST_DOMAIN; getent hosts "$TEST_DOMAIN"` | 至少存在一个有效 nameserver；`getent hosts` 能返回目标域名 IP | **无安全通用修改命令**。DNS 写法取决于 NetworkManager、systemd-resolved、netplan 等实际网络栈；按当前 OS 网络规范修改，避免远程执行错误配置导致失联 |
+| 时间 / NTP | `timedatectl status; if command -v chronyc >/dev/null 2>&1; then chronyc tracking; fi` | 所有节点时区一致；`System clock synchronized: yes`，或 chrony 显示已正常同步 | systemd-timesyncd 环境可执行 `timedatectl set-ntp true`；chrony 环境确认配置正确后执行 `systemctl restart chronyd 2>/dev/null || systemctl restart chrony` |
+| Swap | `swapon --show; grep -iE '^[^#].*[[:space:]]swap[[:space:]]' /etc/fstab || true` | 按当前产品 SOP，`swapon --show` 应无输出，`/etc/fstab` 不应存在启用的 swap 挂载项 | 临时关闭：`swapoff -a`。持久关闭需人工修改 `/etc/fstab` 中对应 swap 项，避免脚本误改其他挂载配置 |
+| firewalld | `if command -v firewall-cmd >/dev/null 2>&1; then systemctl is-active firewalld; else echo 'firewalld: not installed'; fi` | 按当前产品 SOP 应输出 `inactive`，或系统未安装 firewalld | 经变更批准后执行 `systemctl disable firewalld --now` |
+| ufw | `if command -v ufw >/dev/null 2>&1; then ufw status; else echo 'ufw: not installed'; fi` | 按当前产品 SOP 应输出 `Status: inactive`，或系统未安装 ufw | 经变更批准后执行 `ufw disable` |
+| SELinux | `if command -v getenforce >/dev/null 2>&1; then getenforce; else echo 'SELinux: not installed'; fi` | 按当前产品 SOP 应输出 `Disabled`，或系统不使用 SELinux | **不提供一键修改命令**。按发行版规范修改 SELinux 持久配置，并在维护窗口重启后重新执行检查命令 |
+| `nm-cloud-setup`（旧版 RHEL / CentOS） | `systemctl is-enabled nm-cloud-setup.service nm-cloud-setup.timer 2>/dev/null || true` | 对受该 NetworkManager 已知问题影响的旧版 RHEL / CentOS，应为 `disabled` 或 `not-found` | 仅适用于受影响系统：`systemctl disable nm-cloud-setup.service nm-cloud-setup.timer`；官方要求随后重启节点，生产环境必须安排维护窗口 |
+| 根分区 / `/var` 空间 | `df -hT / /var` | 文件系统挂载正常，剩余容量满足当前产品资源规划；不得接近满盘 | **无安全通用清理命令**。优先扩容；如需清理，只删除人工确认无业务价值的文件，禁止直接 `rm -rf` 未知目录 |
+| inode | `df -ih / /var` | inode 使用率保持合理余量，不得接近 100% | 先定位大量小文件目录：`du --inodes -x -d1 /var 2>/dev/null`；只清理人工确认无用的文件 |
+| K3s 数据盘挂载 | `if mountpoint -q /var/lib/rancher/k3s; then echo 'PASS: 独立挂载点'; findmnt /var/lib/rancher/k3s; else echo 'FAIL: /var/lib/rancher/k3s 不是独立挂载点'; fi` | 按产品磁盘规划应输出 `PASS`，并显示规划的数据盘 / LV 挂载到 `/var/lib/rancher/k3s` | **先确认设备和 `/etc/fstab` 完全正确**。仅属于“配置已正确但未挂载”时执行 `mount /var/lib/rancher/k3s`；其他情况按磁盘规划处理 |
+| K3s 数据目录软链接 | `if [ ! -e /var/lib/rancher/k3s ]; then echo 'FAIL: 数据目录不存在'; elif [ -L /var/lib/rancher/k3s ]; then echo 'FAIL: 数据目录是软链接'; else echo 'PASS: 数据目录存在且不是软链接'; fi` | 输出 `PASS` | **禁止直接搬迁现有 K3s 数据**。若发现软链接，按维护流程备份并迁移到真实挂载点 |
+| 文件系统 / Quota | `findmnt -no SOURCE,TARGET,FSTYPE,OPTIONS /var/lib/rancher/k3s` | SOURCE、TARGET、FSTYPE、挂载参数与当前产品磁盘方案一致；使用 XFS Project Quota 时应看到对应 quota 参数 | **无安全通用修改命令**。涉及重新格式化、改文件系统或 quota 时必须在备份、卸载和维护窗口条件下按专项 SOP 处理 |
+| fio 工具 | `if command -v fio >/dev/null 2>&1; then fio --version; else echo 'FAIL: fio 未安装'; fi` | 能输出 fio 版本 | 按当前 OS 包管理器安装 fio。**实际磁盘性能测试必须使用当前产品版本批准的 fio 脚本和阈值，本文不提供通用裸盘压测命令** |
+| SSH 免交互连通 | `read -rp '输入待检查节点 IP/主机名: ' NODE; ssh -o BatchMode=yes -o ConnectTimeout=5 "root@$NODE" true` | 命令无输出并返回成功；部署节点需要能按产品安装方式连接全部目标节点 | 已确认允许 root SSH 且需配置密钥时：`read -rp '输入待配置节点 IP/主机名: ' NODE; ssh-copy-id "root@$NODE"` |
+| 节点基础互通 | `read -rp '输入对端节点 IP/主机名: ' PEER; ping -c 3 "$PEER"` | 能收到对端 ICMP Reply；同时还必须人工确认交换机、ACL、安全组满足 K3s 所需端口策略 | 修正 IP、VLAN、路由、ACL、安全组或主机防火墙；**无跨网络环境通用修改命令** |
+| K3s 端口冲突 | `ss -lntp '( sport = :6443 or sport = :2379 or sport = :2380 or sport = :10250 )'` | 新装节点在安装 K3s 前不应有未知进程占用这些端口；如果本机已运行 K3s，则按现有集群状态判断 | 查明占用进程后再决定迁移端口或停止冲突服务；**禁止直接 kill 未识别进程** |
+| Master / Server 数量 | `read -rp '输入 default.ini 完整路径: ' CFG; n=$(awk '/^\[master\]/{f=1;next} /^\[/{f=0} f && $0 !~ /^[[:space:]]*#/ && $0 !~ /^[[:space:]]*$/ {n++} END{print n+0}' "$CFG"); echo "master_count=$n"; [ "$n" -ge 3 ] && [ $((n % 2)) -eq 1 ] && echo 'PASS: Master 数量为奇数且不少于 3' || echo 'FAIL: Master 数量不符合 HA 要求'` | embedded etcd HA：Master / Server 至少 3 个且为奇数；非 HA 单 Server 场景不套用该判定 | 修改部署规划或 `default.ini` 中的节点角色。**不要通过临时删除健康 Server 来“凑奇数”** |
 
-### K3s 常见关键端口
+### K3s 官方关键网络端口
 
-| 协议/端口 | 用途 |
-| --- | --- |
-| TCP/6443 | Kubernetes API / 节点注册 |
-| TCP/2379-2380 | embedded etcd HA Server 间通信 |
-| TCP/10250 | kubelet / 节点相关通信 |
-| UDP/8472 | Flannel VXLAN，仅 VXLAN backend 使用 |
+以下端口按当前 K3s 官方 System Requirements 校正。是否需要开放取决于实际网络后端和功能，不应全部机械放开。
+
+| 协议 / 端口 | 源 → 目的 | 使用条件 |
+| --- | --- | --- |
+| TCP/6443 | Agent → Server | K3s Supervisor / Kubernetes API，所有集群都需要 |
+| TCP/2379-2380 | Server → Server | 仅 embedded etcd HA 需要 |
+| UDP/8472 | 所有 Node → 所有 Node | 仅 Flannel VXLAN backend 需要；禁止暴露公网 |
+| TCP/10250 | 所有 Node → 所有 Node | 使用 metrics-server / kubelet API 时需要 |
+| UDP/51820 | 所有 Node → 所有 Node | 仅 Flannel WireGuard IPv4 需要 |
+| UDP/51821 | 所有 Node → 所有 Node | 仅 Flannel WireGuard IPv6 需要 |
+| TCP/5001 | 所有 Node → 所有 Node | 仅启用 embedded distributed registry（Spegel）时需要 |
+| TCP/6443 | 所有 Node → 所有 Node | 仅 Spegel 场景额外要求节点间可达 |
+
+> 部署前若需要验证 ACL / 安全组，应该在网络设备或策略平台上核对规则；对尚未启动 K3s 的目标主机执行 `nc -z <IP> 6443` 得到 `Connection refused` 并不能说明网络不通，只能说明当时没有服务监听该 TCP 端口。
 
 ---
 
