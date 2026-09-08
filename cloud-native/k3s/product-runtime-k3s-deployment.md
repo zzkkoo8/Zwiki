@@ -24,6 +24,7 @@
 
 - 表中的检查命令均可直接复制到 Bash 终端执行。
 - 需要现场 IP、域名或文件路径时，命令会先通过 `read` 交互式询问，不再使用 `<server-ip>`、`<测试域名>` 这类无法直接执行的占位符。
+- 表格命令中不使用 Shell 管道符 `|`，避免 Markdown 表格解析后出现反斜杠、断列或复制错误。
 - 修正操作如果不存在跨发行版、跨环境都安全的一键命令，会明确写为“无安全通用命令”，不为了凑命令加入高风险操作。
 - 部署前 K3s 服务尚未启动，因此**不能用 `nc` 连接 6443、2379、2380、10250 是否成功来判断新集群网络是否合格**。部署前只检查节点基础互通、主机端口冲突和外部 ACL / 防火墙策略；服务端口连通性放到安装后验收。
 
@@ -32,17 +33,17 @@
 | CPU 架构 | `uname -m` | 产品支持的 x86_64 主机应输出 `x86_64`；ARM64 主机通常输出 `aarch64`。必须与安装介质架构一致 | **无安全通用修改命令**。更换与 CPU 架构匹配的安装介质 |
 | CPU / 内存 | `nproc; free -h` | 不低于当前产品版本的资源规划；裸 K3s 官方最低值仅作为底座基线，不能替代产品资源要求 | **无软件修正命令**。扩容 CPU / 内存或调整节点规格 |
 | 内核 / OS | `uname -r; cat /etc/os-release` | Linux 内核和发行版必须位于当前产品版本支持范围内 | **无安全通用修改命令**。升级或更换受支持的 OS / Kernel，完成后重新检查 |
-| cgroup | `mountpoint -q /sys/fs/cgroup && echo 'PASS: cgroup 已挂载' || echo 'FAIL: cgroup 未挂载'; stat -fc %T /sys/fs/cgroup` | 输出 `PASS`；并能识别 cgroup 文件系统。K3s 依赖可用的 cgroup | **无跨发行版通用修正命令**。按当前 OS 的 cgroup 配置方式处理后重启并复查 |
-| ARM `lrcpc` | `if [ "$(uname -m)" = "aarch64" ]; then grep -qw lrcpc /proc/cpuinfo && echo 'PASS: lrcpc' || echo 'FAIL: 缺少 lrcpc'; else echo 'SKIP: 非 ARM64'; fi` | x86_64 输出 `SKIP`；当前产品要求 `lrcpc` 的 ARM64 节点必须输出 `PASS` | **无软件修正命令**。CPU 不具备该特性时更换兼容硬件或确认当前产品版本的兼容方案 |
+| cgroup | `if mountpoint -q /sys/fs/cgroup; then echo 'PASS: cgroup 已挂载'; else echo 'FAIL: cgroup 未挂载'; fi; stat -fc %T /sys/fs/cgroup` | 输出 `PASS`；并能识别 cgroup 文件系统。K3s 依赖可用的 cgroup | **无跨发行版通用修正命令**。按当前 OS 的 cgroup 配置方式处理后重启并复查 |
+| ARM `lrcpc` | `if [ "$(uname -m)" = "aarch64" ]; then if grep -qw lrcpc /proc/cpuinfo; then echo 'PASS: lrcpc'; else echo 'FAIL: 缺少 lrcpc'; fi; else echo 'SKIP: 非 ARM64'; fi` | x86_64 输出 `SKIP`；当前产品要求 `lrcpc` 的 ARM64 节点必须输出 `PASS` | **无软件修正命令**。CPU 不具备该特性时更换兼容硬件或确认当前产品版本的兼容方案 |
 | Page Size | `getconf PAGESIZE` | 标准路径通常为 `4096`；若输出 `65536`，必须确认当前产品版本的 64 KiB Page Size 专项兼容要求 | **禁止通过系统参数强改 Page Size**。按产品专项兼容方案处理 |
-| 主机名 | `hostname; h=$(hostname); [[ "$h" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]] && echo 'PASS: hostname 格式正确' || echo 'FAIL: hostname 格式错误'` | 主机名唯一；按产品命名规范使用小写字母、数字和 `-`；格式检查输出 `PASS` | `read -rp '输入新主机名: ' NEW_HOSTNAME; [[ "$NEW_HOSTNAME" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]] && hostnamectl set-hostname "$NEW_HOSTNAME" || echo 'ERROR: 主机名格式不合法'` |
-| DNS | `grep -E '^nameserver[[:space:]]+' /etc/resolv.conf || echo 'FAIL: 未配置 nameserver'; read -rp '输入环境中应可解析的域名: ' TEST_DOMAIN; getent hosts "$TEST_DOMAIN"` | 至少存在一个有效 nameserver；`getent hosts` 能返回目标域名 IP | **无安全通用修改命令**。DNS 写法取决于 NetworkManager、systemd-resolved、netplan 等实际网络栈；按当前 OS 网络规范修改，避免远程执行错误配置导致失联 |
-| 时间 / NTP | `timedatectl status; if command -v chronyc >/dev/null 2>&1; then chronyc tracking; fi` | 所有节点时区一致；`System clock synchronized: yes`，或 chrony 显示已正常同步 | systemd-timesyncd 环境可执行 `timedatectl set-ntp true`；chrony 环境确认配置正确后执行 `systemctl restart chronyd 2>/dev/null || systemctl restart chrony` |
-| Swap | `swapon --show; grep -iE '^[^#].*[[:space:]]swap[[:space:]]' /etc/fstab || true` | 按当前产品 SOP，`swapon --show` 应无输出，`/etc/fstab` 不应存在启用的 swap 挂载项 | 临时关闭：`swapoff -a`。持久关闭需人工修改 `/etc/fstab` 中对应 swap 项，避免脚本误改其他挂载配置 |
+| 主机名 | `hostname; h=$(hostname); if [[ "$h" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]]; then echo 'PASS: hostname 格式正确'; else echo 'FAIL: hostname 格式错误'; fi` | 主机名唯一；按产品命名规范使用小写字母、数字和 `-`；格式检查输出 `PASS` | `read -rp '输入新主机名: ' NEW_HOSTNAME; if [[ "$NEW_HOSTNAME" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]]; then hostnamectl set-hostname "$NEW_HOSTNAME"; else echo 'ERROR: 主机名格式不合法'; fi` |
+| DNS | `if grep -E '^nameserver[[:space:]]+' /etc/resolv.conf; then :; else echo 'FAIL: 未配置 nameserver'; fi; read -rp '输入环境中应可解析的域名: ' TEST_DOMAIN; getent hosts "$TEST_DOMAIN"` | 至少存在一个有效 nameserver；`getent hosts` 能返回目标域名 IP | **无安全通用修改命令**。DNS 写法取决于 NetworkManager、systemd-resolved、netplan 等实际网络栈；按当前 OS 网络规范修改，避免远程执行错误配置导致失联 |
+| 时间 / NTP | `timedatectl status; if command -v chronyc >/dev/null 2>&1; then chronyc tracking; fi` | 所有节点时区一致；`System clock synchronized: yes`，或 chrony 显示已正常同步 | systemd-timesyncd 环境可执行 `timedatectl set-ntp true`；chrony 环境确认配置正确后执行 `if systemctl list-unit-files chronyd.service >/dev/null 2>&1; then systemctl restart chronyd; else systemctl restart chrony; fi` |
+| Swap | `swapon --show; grep -iE '^[^#].*[[:space:]]swap[[:space:]]' /etc/fstab` | 按当前产品 SOP，`swapon --show` 应无输出，`/etc/fstab` 不应存在启用的 swap 挂载项 | 临时关闭：`swapoff -a`。持久关闭需人工修改 `/etc/fstab` 中对应 swap 项，避免脚本误改其他挂载配置 |
 | firewalld | `if command -v firewall-cmd >/dev/null 2>&1; then systemctl is-active firewalld; else echo 'firewalld: not installed'; fi` | 按当前产品 SOP 应输出 `inactive`，或系统未安装 firewalld | 经变更批准后执行 `systemctl disable firewalld --now` |
 | ufw | `if command -v ufw >/dev/null 2>&1; then ufw status; else echo 'ufw: not installed'; fi` | 按当前产品 SOP 应输出 `Status: inactive`，或系统未安装 ufw | 经变更批准后执行 `ufw disable` |
 | SELinux | `if command -v getenforce >/dev/null 2>&1; then getenforce; else echo 'SELinux: not installed'; fi` | 按当前产品 SOP 应输出 `Disabled`，或系统不使用 SELinux | **不提供一键修改命令**。按发行版规范修改 SELinux 持久配置，并在维护窗口重启后重新执行检查命令 |
-| `nm-cloud-setup`（旧版 RHEL / CentOS） | `systemctl is-enabled nm-cloud-setup.service nm-cloud-setup.timer 2>/dev/null || true` | 对受该 NetworkManager 已知问题影响的旧版 RHEL / CentOS，应为 `disabled` 或 `not-found` | 仅适用于受影响系统：`systemctl disable nm-cloud-setup.service nm-cloud-setup.timer`；官方要求随后重启节点，生产环境必须安排维护窗口 |
+| `nm-cloud-setup`（旧版 RHEL / CentOS） | `if systemctl list-unit-files nm-cloud-setup.service >/dev/null 2>&1; then systemctl is-enabled nm-cloud-setup.service nm-cloud-setup.timer; else echo 'nm-cloud-setup: not installed'; fi` | 对受该 NetworkManager 已知问题影响的旧版 RHEL / CentOS，应为 `disabled` 或 `not-found` | 仅适用于受影响系统：`systemctl disable nm-cloud-setup.service nm-cloud-setup.timer`；官方要求随后重启节点，生产环境必须安排维护窗口 |
 | 根分区 / `/var` 空间 | `df -hT / /var` | 文件系统挂载正常，剩余容量满足当前产品资源规划；不得接近满盘 | **无安全通用清理命令**。优先扩容；如需清理，只删除人工确认无业务价值的文件，禁止直接 `rm -rf` 未知目录 |
 | inode | `df -ih / /var` | inode 使用率保持合理余量，不得接近 100% | 先定位大量小文件目录：`du --inodes -x -d1 /var 2>/dev/null`；只清理人工确认无用的文件 |
 | K3s 数据盘挂载 | `if mountpoint -q /var/lib/rancher/k3s; then echo 'PASS: 独立挂载点'; findmnt /var/lib/rancher/k3s; else echo 'FAIL: /var/lib/rancher/k3s 不是独立挂载点'; fi` | 按产品磁盘规划应输出 `PASS`，并显示规划的数据盘 / LV 挂载到 `/var/lib/rancher/k3s` | **先确认设备和 `/etc/fstab` 完全正确**。仅属于“配置已正确但未挂载”时执行 `mount /var/lib/rancher/k3s`；其他情况按磁盘规划处理 |
@@ -52,7 +53,7 @@
 | SSH 免交互连通 | `read -rp '输入待检查节点 IP/主机名: ' NODE; ssh -o BatchMode=yes -o ConnectTimeout=5 "root@$NODE" true` | 命令无输出并返回成功；部署节点需要能按产品安装方式连接全部目标节点 | 已确认允许 root SSH 且需配置密钥时：`read -rp '输入待配置节点 IP/主机名: ' NODE; ssh-copy-id "root@$NODE"` |
 | 节点基础互通 | `read -rp '输入对端节点 IP/主机名: ' PEER; ping -c 3 "$PEER"` | 能收到对端 ICMP Reply；同时还必须人工确认交换机、ACL、安全组满足 K3s 所需端口策略 | 修正 IP、VLAN、路由、ACL、安全组或主机防火墙；**无跨网络环境通用修改命令** |
 | K3s 端口冲突 | `ss -lntp '( sport = :6443 or sport = :2379 or sport = :2380 or sport = :10250 )'` | 新装节点在安装 K3s 前不应有未知进程占用这些端口；如果本机已运行 K3s，则按现有集群状态判断 | 查明占用进程后再决定迁移端口或停止冲突服务；**禁止直接 kill 未识别进程** |
-| Master / Server 数量 | `read -rp '输入 default.ini 完整路径: ' CFG; n=$(awk '/^\[master\]/{f=1;next} /^\[/{f=0} f && $0 !~ /^[[:space:]]*#/ && $0 !~ /^[[:space:]]*$/ {n++} END{print n+0}' "$CFG"); echo "master_count=$n"; [ "$n" -ge 3 ] && [ $((n % 2)) -eq 1 ] && echo 'PASS: Master 数量为奇数且不少于 3' || echo 'FAIL: Master 数量不符合 HA 要求'` | embedded etcd HA：Master / Server 至少 3 个且为奇数；非 HA 单 Server 场景不套用该判定 | 修改部署规划或 `default.ini` 中的节点角色。**不要通过临时删除健康 Server 来“凑奇数”** |
+| Master / Server 数量 | `read -rp '输入 default.ini 完整路径: ' CFG; n=$(awk '/^\[master\]/{f=1;next} /^\[/{f=0} f && $0 !~ /^[[:space:]]*#/ && $0 !~ /^[[:space:]]*$/ {n++} END{print n+0}' "$CFG"); echo "master_count=$n"; if [ "$n" -ge 3 ] && [ $((n % 2)) -eq 1 ]; then echo 'PASS: Master 数量为奇数且不少于 3'; else echo 'FAIL: Master 数量不符合 HA 要求'; fi` | embedded etcd HA：Master / Server 至少 3 个且为奇数；非 HA 单 Server 场景不套用该判定 | 修改部署规划或 `default.ini` 中的节点角色。**不要通过临时删除健康 Server 来“凑奇数”** |
 
 ### K3s 官方关键网络端口
 
