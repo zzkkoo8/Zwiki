@@ -7,6 +7,7 @@
     * [服务器双分区启动 U 盘](infrastructure/hardware/bootable-usb-fat32-exfat.md)
   * [系统](infrastructure/system/README.md)
     * [Linux 运维开局常用命令](infrastructure/system/linux-ops-bootstrap.md)
+    * [Linux 磁盘与 LVM 扩容](infrastructure/system/linux-lvm-disk-expansion.md)
     * [Ubuntu22 内核漏洞安全加固](infrastructure/system/ubuntu22-kernel-security-hardening.md)
     * [macOS 合盖后崩溃重启排查](infrastructure/system/macos-lid-close-restart.md)
   * [网络](infrastructure/network/README.md)
