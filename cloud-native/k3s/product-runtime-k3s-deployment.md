@@ -769,10 +769,295 @@ Gate 7：Node / Pod / API / 数据目录验收
 
 ---
 
-## 15. 参考资料
+## 15. 断电 / 重启后全链路故障排查与恢复
+
+适用于机房断电、宿主机异常重启后，产品页面或业务持续异常的场景。排查顺序固定为：
+
+```text
+硬件 / 磁盘
+  ↓
+Linux / 网络 / 时间
+  ↓
+K3s 服务 / containerd
+  ↓
+API / Node
+  ↓
+Pod / PVC
+  ↓
+Service / Ingress
+  ↓
+产品应用
+```
+
+**第一个异常层就是优先故障定位点。先修根因，再考虑重启 Pod 或 K3s。**
+
+K3s 是标准 Kubernetes 发行版，本文中的 `kubectl get / describe / logs / events` 与标准 K8s 用法一致；K3s 也可使用 `k3s kubectl`。`systemctl restart k3s`、`k3s crictl` 等属于 K3s 主机侧命令。
+
+### 15.1 操作安全边界
+
+- 排查阶段优先使用只读命令；k9s 建议使用 `k9s --readonly`。
+- k9s 的 `Ctrl+D` 是 **Delete**，`Ctrl+K` 是 **Kill / 立即删除**，排查时不要误触。
+- HA 集群的 Server/Master **禁止同时重启**，必须逐台处理，每台恢复 `Ready` 后再处理下一台。
+- StatefulSet（PostgreSQL、TiKV、MinIO、Redis 等）禁止同时重启多个副本。
+- `PVC/PV`、数据库数据目录、`/var/lib/rancher/k3s` 不允许通过“删除重建”方式碰运气恢复。
+- 文件系统报错时禁止直接对已挂载设备执行 `fsck` / `xfs_repair`；必须进入维护窗口、备份并卸载后处理。
+
+### 15.2 从主机到底座逐层检查
+
+| 层级 | 检查命令 | 正常反馈 / 判定 | 异常后的修正命令 | 修正后验证 |
+| --- | --- | --- | --- | --- |
+| 重启事实 | `uptime; last -x \| head -20` | 启动时间与断电恢复时间一致；无持续重复 reboot | 若反复重启，先查 BMC/电源/硬件；**无安全通用一键修复命令** | `uptime` 持续增长，无再次 reboot |
+| 磁盘与挂载 | `lsblk -f; findmnt -T /var/lib/rancher/k3s; df -hT / /var /var/lib/rancher/k3s; df -ih / /var /var/lib/rancher/k3s` | 规划磁盘存在、数据目录已挂载；空间和 inode 未耗尽 | 若设备健康且 `/etc/fstab` 已确认正确、仅挂载丢失：`mount /var/lib/rancher/k3s`；空间不足优先扩容，不执行未知目录批量删除 | 再执行 `findmnt`、`df -hT`、`df -ih` |
+| 磁盘 / 文件系统错误 | `dmesg -T \| grep -Ei 'I/O error|EXT4-fs error|XFS.*error|nvme.*error|blk_update_request' \| tail -100` | 无持续 I/O / 文件系统错误 | 若存在 I/O/FS 错误：停止继续重启 Pod；先更换/修复硬盘。文件系统修复仅在**卸载 + 备份 + 维护窗口**执行，例如 XFS：`xfs_repair <device>`；ext4：`fsck -f <device>` | 挂载后重新执行 `dmesg`、`findmnt`、`df`，确认无新错误 |
+| 网卡与路由 | `ip -br a; ip route; ping -c 3 <gateway>; nc -zvw3 <server-ip> 6443` | 业务网卡 UP、默认/业务路由正确；网关及 K3s API 可达 | 仅网卡被置 DOWN 时：`ip link set <nic> up`；网络服务异常且确认允许中断时：`systemctl restart NetworkManager` 或对应网络服务 | 重跑 `ip -br a`、`ip route`、`ping`、`nc` |
+| 时间同步 | `timedatectl` | 时区正确；`System clock synchronized: yes` 或等价状态 | `timedatectl set-ntp true`；chrony 环境可执行 `systemctl restart chronyd` | `timedatectl`; `chronyc tracking 2>/dev/null || true` |
+| K3s Server 服务 | `systemctl is-active k3s; systemctl status k3s --no-pager -l; journalctl -u k3s -n 200 --no-pager` | `active`；日志无持续启动失败 | **先修磁盘/网络/时间后**：`systemctl restart k3s`。HA Server 逐台执行 | `systemctl is-active k3s`; `kubectl get nodes -o wide` |
+| K3s Worker/Agent | `systemctl is-active k3s-agent; systemctl status k3s-agent --no-pager -l; journalctl -u k3s-agent -n 200 --no-pager` | `active`；能连接 Server | **先修底层故障后**：`systemctl restart k3s-agent` | `systemctl is-active k3s-agent`; 在 Server 上执行 `kubectl get nodes -o wide` |
+| containerd / CRI | `k3s crictl info; k3s crictl ps -a; k3s crictl images` | CRI 可响应；容器和镜像列表可读取 | K3s 内置 containerd 通常不单独重启；修复磁盘/网络后重启该节点 `k3s` 或 `k3s-agent` 服务 | `k3s crictl info`; `k3s crictl ps -a` |
+| K3s / containerd 日志 | `tail -200 /var/lib/rancher/k3s/agent/containerd/containerd.log 2>/dev/null; journalctl -u k3s -n 200 --no-pager 2>/dev/null; journalctl -u k3s-agent -n 200 --no-pager 2>/dev/null` | 无持续 `no space left`、I/O、DNS、registry、sandbox 等错误 | 按日志对应根因修复；不要只靠重复 restart 掩盖错误 | 重查相同日志，确认错误不再持续新增 |
+| API / Node | `kubectl get --raw='/readyz?verbose'; kubectl get nodes -o wide` | API Ready；全部节点 `Ready` | `NotReady` 先定位对应节点；修复节点底层后，仅重启该节点的 `k3s` / `k3s-agent` | `kubectl get nodes -o wide` 全部 `Ready` |
+| Node 压力 | `kubectl describe node <node>` | Conditions 中 `DiskPressure=False`、`MemoryPressure=False`、`PIDPressure=False` | DiskPressure→扩容/释放已确认无用空间；MemoryPressure→降低异常负载或调整资源；PIDPressure→定位异常进程。修根因后等待 Node 状态恢复 | `kubectl describe node <node>` 查看 Conditions |
+| Pod | `kubectl get pods -A -o wide; kubectl describe pod <pod> -n <ns>; kubectl logs <pod> -n <ns> --all-containers --tail=200` | 常驻 Pod 为 `Running/Ready`；Job 可 `Completed` | 按 15.3 对应状态修复，不批量删除 Pod | `kubectl get pods -A -o wide` |
+| PVC / PV | `kubectl get pvc -A; kubectl get pv; kubectl get storageclass` | PVC 为 `Bound`；PV 状态正常 | 先修 CSI/后端存储/节点挂载；**不要先删除 PVC/PV** | 再执行 `kubectl get pvc -A; kubectl get pv` |
+| Service | `kubectl get svc -A; kubectl get endpoints -A; kubectl get endpointslices -A` | Service 对应 Endpoints 非空（无后端的服务除外） | 标签/端口配置确有错误时，优先修 Helm/Ansible/manifest 源配置；临时核验可 `kubectl edit svc <svc> -n <ns>` | `kubectl get endpoints <svc> -n <ns> -o wide` |
+| 产品应用 | `kubectl logs <pod> -n <ns> --all-containers --tail=200` | 无持续数据库、Redis、MQ、证书、DNS、依赖连接错误 | 先恢复依赖；无状态 Deployment 可在确认根因修复后执行 `kubectl rollout restart deployment/<name> -n <ns>` | `kubectl rollout status deployment/<name> -n <ns>` + 业务验证 |
+
+> `kubectl top node` / `kubectl top pod -A` 可辅助判断 CPU/内存压力；若集群未安装或未恢复 metrics-server，命令不可用本身不能直接判定业务故障。
+
+### 15.3 常见 Pod 状态：检查与修正
+
+#### Evicted
+
+含义：Pod 被 kubelet 驱逐。断电后最常见原因之一是节点磁盘、inode 或内存压力。
+
+检查：
+
+```bash
+kubectl describe pod <pod> -n <ns>
+kubectl describe node <node>
+df -hT / /var /var/lib/rancher/k3s
+df -ih / /var /var/lib/rancher/k3s
+```
+
+判定：重点查看 `Reason: Evicted`、`DiskPressure`、`MemoryPressure`、`ephemeral-storage`。
+
+修正：**先恢复节点资源**。确认 Pod 由控制器管理：
+
+```bash
+kubectl get pod <pod> -n <ns> -o jsonpath='{.metadata.ownerReferences[*].kind}{"\n"}'
+```
+
+若根因已经修复，且 Pod 明确属于 Deployment/StatefulSet/DaemonSet/Job 等控制器，旧的 Evicted 对象可按需清理：
+
+```bash
+kubectl delete pod <pod> -n <ns>
+```
+
+验证：
+
+```bash
+kubectl get pods -n <ns> -o wide
+kubectl describe node <node>
+```
+
+#### CrashLoopBackOff
+
+含义：容器反复启动失败，Kubernetes 正在退避重试。
+
+检查：
+
+```bash
+kubectl logs <pod> -n <ns> --all-containers --previous --tail=200
+kubectl describe pod <pod> -n <ns>
+```
+
+修正：先修配置、证书、依赖服务、启动参数或探针。无状态 Deployment 修复完成后可：
+
+```bash
+kubectl rollout restart deployment/<name> -n <ns>
+kubectl rollout status deployment/<name> -n <ns>
+```
+
+StatefulSet 不批量 rollout；确认副本角色和数据安全后，只处理单个异常 Pod。
+
+#### ImagePullBackOff / ErrImagePull
+
+检查：
+
+```bash
+kubectl describe pod <pod> -n <ns>
+kubectl get events -n <ns> --sort-by='.lastTimestamp'
+```
+
+登录该 Pod 所在 Node 后，可直接验证运行时能否拉镜像：
+
+```bash
+k3s crictl pull <image>
+```
+
+修正：恢复 DNS、镜像仓库网络、镜像地址或 `imagePullSecrets`。根因修复后 kubelet 会继续重试；必要时再删除由控制器管理的异常 Pod 触发重建。
+
+#### Pending
+
+检查：
+
+```bash
+kubectl describe pod <pod> -n <ns>
+kubectl get pvc -n <ns>
+kubectl get nodes
+```
+
+判定：查看 `FailedScheduling`、资源不足、taint/affinity、PVC 未绑定。
+
+修正：补足资源、恢复存储或修正调度配置。不要为了让 Pod 跑起来直接删除未知 taint 或 PVC。
+
+#### OOMKilled
+
+`OOM` = Out Of Memory，表示容器或主机可用内存不足；`OOMKilled` 表示进程被内核 OOM 机制终止。
+
+检查：
+
+```bash
+kubectl describe pod <pod> -n <ns>
+kubectl top pod <pod> -n <ns> 2>/dev/null || true
+free -h
+```
+
+修正：确认真实内存需求后调整 Helm/Ansible/manifest 中的 `resources.requests/limits`，或修复内存泄漏。不要只靠无限增大 limit 掩盖问题。
+
+#### CreateContainerConfigError / FailedCreatePodSandBox
+
+检查：
+
+```bash
+kubectl describe pod <pod> -n <ns>
+kubectl get events -n <ns> --sort-by='.lastTimestamp'
+```
+
+- `CreateContainerConfigError`：重点查 ConfigMap、Secret、Volume、环境变量。
+- `FailedCreatePodSandBox`：重点查 CNI、pause/sandbox 镜像、containerd、DNS/registry、节点磁盘。
+
+修正后验证：
+
+```bash
+kubectl get pod <pod> -n <ns> -o wide
+kubectl describe pod <pod> -n <ns>
+```
+
+### 15.4 k9s 只读排查速查
+
+建议现场先进入只读模式：
+
+```bash
+k9s --readonly
+```
+
+| 操作 | 命令 / 快捷键 |
+| --- | --- |
+| Pod | `:po` / `:pod` |
+| Node | `:node` |
+| StatefulSet | `:sts` |
+| Deployment | `:deploy` |
+| PVC | `:pvc` |
+| Events | `:events` |
+| Describe | `d` |
+| Logs | `l` |
+| 搜索 / 过滤 | `/` |
+| 当前版本帮助 | `?` |
+| 返回 / 取消过滤 | `Esc` |
+| 退出 | `:q` / `Ctrl+C` |
+
+警告：正常模式中 `Ctrl+D` 为 Delete，`Ctrl+K` 为立即 Kill；不要把它们当成翻页键。
+
+### 15.5 典型实测：磁盘不足 → Evicted → 镜像缺失
+
+典型链路：
+
+```text
+节点磁盘不足
+  → DiskPressure
+  → kubelet 驱逐 Pod
+  → image GC 清理未使用镜像
+  → Pod 显示 Evicted / FailedCreatePodSandBox / ImagePullBackOff
+  → 产品持续异常
+```
+
+检查顺序：
+
+```bash
+kubectl get pods -A -o wide
+kubectl describe pod <异常Pod> -n <ns>
+kubectl describe node <异常Node>
+
+# 登录异常 Node
+df -hT / /var /var/lib/rancher/k3s
+df -ih / /var /var/lib/rancher/k3s
+du -xhd1 /var/lib/rancher/k3s 2>/dev/null | sort -h
+k3s crictl images
+journalctl -u k3s -n 200 --no-pager 2>/dev/null
+journalctl -u k3s-agent -n 200 --no-pager 2>/dev/null
+```
+
+判定：如果 `df`/inode 已耗尽，Node 出现 `DiskPressure`，同时 Events/日志出现 `Evicted`、`no space left on device`、镜像或 sandbox 拉取失败，则优先故障层为**节点存储**，不是 Pod 本身。
+
+修正顺序：
+
+1. 扩容数据盘，或只清理由人工确认无业务价值的文件；禁止直接删除 `/var/lib/rancher/k3s` 下未知内容。
+2. `df -hT`、`df -ih` 确认空间恢复，`findmnt` 确认数据盘正常。
+3. 若运行时仍异常：Worker 执行 `systemctl restart k3s-agent`；Server 执行 `systemctl restart k3s`。
+4. HA Server 必须逐台重启；每台都等到重新 `Ready` 后再处理下一台。
+5. 返回集群验证：
+
+```bash
+kubectl get nodes -o wide
+kubectl get pods -A -o wide
+kubectl get events -A --sort-by='.lastTimestamp'
+```
+
+**已经扩容的节点应逐台执行检查；只有服务/运行时仍异常的节点才需要 restart，不建议无差别同时重启所有 K3s 节点。**
+
+### 15.6 最终定位规则
+
+```text
+硬件异常        → 修硬件，不碰 Pod
+磁盘/FS 异常    → 修磁盘/挂载/文件系统
+网络/时间异常   → 修系统基础环境
+K3s/CRI 异常    → 修对应节点 K3s 服务
+Node 压力异常   → 修 Node 资源
+PVC 异常        → 修 CSI/存储
+Pod 异常        → 查日志/配置/依赖
+Service 异常    → 查 Endpoint/Selector/Port
+以上全正常      → 进入产品业务自身排障
+```
+
+不要跳层。**下层未恢复时，上层重启通常只能暂时改变现象，不能消除根因。**
+
+### 15.7 术语速查
+
+| 术语 | 含义 |
+| --- | --- |
+| `OOM / OOMKilled` | Out Of Memory；内存不足，进程被内核终止 |
+| `DiskPressure` | kubelet 判断节点磁盘空间或 inode 达到驱逐压力阈值 |
+| `Evicted` | Pod 被 kubelet 主动驱逐，不等同于应用自身崩溃 |
+| `CrashLoopBackOff` | 容器反复启动失败，Kubernetes 延迟后继续重试 |
+| `ImagePullBackOff` | 镜像拉取失败并进入退避重试 |
+| `CRI` | Container Runtime Interface；Kubernetes 与 containerd 等运行时的接口 |
+| `CNI` | Container Network Interface；Pod 网络接口规范 |
+| `CSI` | Container Storage Interface；Kubernetes 存储插件接口 |
+| `PVC / PV` | PersistentVolumeClaim / PersistentVolume；持久卷申请 / 持久卷 |
+| `inode` | 文件系统用于记录文件元数据的索引节点；inode 耗尽时即使仍有容量也无法新建文件 |
+| `quorum` | 多数派；etcd HA 维持一致性和可写能力所需的多数节点 |
+
+---
+
+## 16. 参考资料
 
 - K3s 官方：System Requirements — https://docs.k3s.io/zh/installation/requirements
 - K3s 官方：High Availability Embedded etcd — https://docs.k3s.io/zh/datastore/ha-embedded
+- K3s 官方：FAQ / 日志位置 — https://docs.k3s.io/zh/faq
+- K3s 官方：Advanced Options / systemd 服务日志 — https://docs.k3s.io/zh/advanced
+- Kubernetes 官方：Node-pressure Eviction — https://kubernetes.io/zh-cn/docs/concepts/scheduling-eviction/node-pressure-eviction/
+- K9s 官方：Commands — https://k9scli.io/topics/commands/
 - 内部来源：《牧云集群版 管理端安装部署（chroot版）》
 
 > 原 SOP 中涉及内部 Release 平台、内部附件和专项文档的链接未复制到公开知识库。安装介质、产品资源阈值、64K Page Size 专项步骤等应从当前交付渠道获取最新版本。
