@@ -8,8 +8,11 @@
 - **macOS 有线网卡**：`en3`，`10.7.216.246/24`
 - **Clash/Mihomo**：`10.7.216.246:7897`
 - **Linux 示例主机**：`10.7.216.249`
+- **Linux 默认网关**：`10.7.216.247`，保持不变
 - **原则**：不改 Linux IP、默认网关、路由；不开 macOS“互联网共享”
 - **实测**：2026-09-09，`cw249`—`cw253` 五台 Kylin V10 SP3 主机均可经该代理访问互联网和麒麟官方仓库
+
+> 以下 IP、接口名和端口是现场实测案例；其他环境按实际网络参数替换。
 
 ```text
 互联网
@@ -29,9 +32,18 @@ Linux 服务器
 
 ### 1.1 检查双网卡和路由
 
+接口名不确定时先执行：
+
+```bash
+networksetup -listallhardwareports
+```
+
+检查地址和路由：
+
 ```bash
 ipconfig getifaddr en0
 ipconfig getifaddr en3
+ifconfig en3
 route -n get default
 route -n get 10.7.216.249
 ```
