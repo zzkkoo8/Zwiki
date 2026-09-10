@@ -15,7 +15,11 @@
     * [Ubuntu22 内核漏洞安全加固](infrastructure/system/ubuntu22-kernel-security-hardening.md)
     * [macOS 合盖后崩溃重启排查](infrastructure/system/macos-lid-close-restart.md)
   * [网络](infrastructure/network/README.md)
+    * [网络故障快速排查](infrastructure/network/network-troubleshooting.md)
+    * [tcpdump 抓包与快速判断](infrastructure/network/tcpdump-packet-analysis.md)
   * [基础服务](infrastructure/services/README.md)
+    * [Nginx 日常运维速查](infrastructure/services/nginx-operations.md)
+    * [Nginx 故障排查速查](infrastructure/services/nginx-troubleshooting.md)
 
 * [容器与云原生](cloud-native/README.md)
   * [Docker](cloud-native/docker/README.md)
