@@ -1,6 +1,11 @@
 # K3s
 
-记录 K3s 发行版特有的安装、配置、集群运维和故障恢复文章。
+记录 K3s 发行版特有的安装、配置、集群运维和故障恢复文章，Kubernetes 通用机制不在这里重复维护。
+
+## 常用速查
+
+- [K3s 日常运维速查](k3s-operations.md)：Server/Agent、日志、containerd、镜像导入、私仓和内置组件检查。
+- [K3s 备份与恢复速查](k3s-backup-recovery.md)：datastore 类型判断、embedded etcd snapshot、Server Token、恢复前检查和升级前保护。
 
 ## 部署手册
 
