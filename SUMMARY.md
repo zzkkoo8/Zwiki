@@ -23,6 +23,8 @@
 
 * [容器与云原生](cloud-native/README.md)
   * [Docker](cloud-native/docker/README.md)
+    * [Docker 日常运维速查](cloud-native/docker/docker-operations.md)
+    * [Docker 故障排查速查](cloud-native/docker/docker-troubleshooting.md)
   * [Kubernetes](cloud-native/kubernetes/README.md)
   * [K3s](cloud-native/k3s/README.md)
     * [产品运行底座：K3s 集群部署手册](cloud-native/k3s/product-runtime-k3s-deployment.md)
