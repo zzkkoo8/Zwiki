@@ -259,13 +259,13 @@ docker compose images
 docker compose up -d
 ```
 
-只重建单个服务：
+只针对目标服务执行启动/更新，不启动其依赖服务：
 
 ```bash
 docker compose up -d --no-deps <service>
 ```
 
-如果镜像或配置变化需要强制重建，应先确认服务数据已经持久化以及依赖影响，不把 `--force-recreate` 当默认参数。
+该命令是否实际重建容器取决于当前容器状态、配置和镜像变化；如果镜像或配置变化需要强制重建，应先确认服务数据已经持久化以及依赖影响，不把 `--force-recreate` 当默认参数。
 
 查看最终展开后的 Compose 配置：
 
