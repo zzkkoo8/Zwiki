@@ -31,6 +31,8 @@
     * [Helm 日常运维速查](cloud-native/kubernetes/helm-operations.md)
     * [K9s 日常运维速查](cloud-native/kubernetes/k9s-operations.md)
   * [K3s](cloud-native/k3s/README.md)
+    * [K3s 日常运维速查](cloud-native/k3s/k3s-operations.md)
+    * [K3s 备份与恢复速查](cloud-native/k3s/k3s-backup-recovery.md)
     * [产品运行底座：K3s 集群部署手册](cloud-native/k3s/product-runtime-k3s-deployment.md)
 
 * [开发](development/README.md)
