@@ -3,562 +3,62 @@
 >
 > 权威源：<https://github.com/zzkkoo8/xmg-qa2/blob/main/docs/design/XMG-QA2-SUPPORT-AGENT-DESIGN.md>
 >
-> Source Commit: `a2c5399f7c86c19913ca857e7745544e30e0f6c5`
+> Source Commit: `fd5e19c813aa86e8c56830fdb0cd197f28b85c9f`
 
-# xmg-qa2 技术支持专家 Agent 设计稿
+# xmg-qa2 技术支持 Agent 设计
 
-Status: **Architecture Baseline / Pre-Implementation**
+版本：1.1；日期：2026-09-05；Pre-Implementation。
 
-## 1. 产品定位
+## 1. 产品定义
 
-xmg-qa2 是一款面向客户技术支持场景的 **问题回答专家 Agent**。
+小马哥的首要功能是高质量回答问题，表现为能持续调查的数字技术支持工程师。先理解所问，能可靠回答就及时回答，缺证据则自主补齐；任务管理与 Web 等能力保障这一过程。它将内部产品资料、官方公开文档、模型通用知识和获准现场观察放在同一调查工作区，提出并验证假设，明确哪些结论已证实、哪些仍待补充。
 
-它不是“问一次知识库、再让模型回答”的普通 RAG Chatbot，而是一个可控的技术问题调查与回答 Runtime：
+问题的业务单位是 SupportTask，聊天输入是 Turn；一次进程执行是 Run。三个概念分开后，任务才能在等待几天、换入口、Worker 重启后继续。规范性要求见[需求基线](../requirements/REQUIREMENTS-BASELINE.md)，本文不复制一套不同范围。
 
-- 自动读取 `xmg-kb` 及其他 Knowledge Provider。
-- 自动调用已授权的第三方产品 API。
-- 自动调用 MCP、诊断工具和运维工具。
-- 根据已有 Evidence 判断是否需要继续调查。
-- 在必要时建立 Hypothesis，并主动获取新证据进行验证或推翻。
-- 简单问题直接回答，避免无意义的工具调用。
-- 复杂问题自动整理为结构化技术分析报告。
+## 2. 一个完整场景
 
-目标不是无限自主执行，而是：
+1. 工程师在钉钉问：“WAF 更新后反向代理出现 502。”系统持久接收事件，返回任务编号。
+2. 小马哥确认产品、版本和现象，优先检索匹配的内部资料。若信息已足够，给有引用的答案。
+3. 证据不够时提出可验证假设，并根据配置选择官方资料或已授权只读 API/MCP；不机械调用全部工具。
+4. 现场连接不可用时，保存已知事实与待验证项，生成有边界的诊断步骤，创建 HumanRequest，进入 WAITING_FOR_HUMAN。
+5. 工程师第二天回传日志，系统验证 task/request/身份和状态版本，只消费一次恢复事件。保留原有证据，继续验证。
+6. 目标完整回答且通过检查后输出原因、依据、建议、风险及必要报告，状态 RESOLVED；仍待现场验证则保持等待。只有用户确认才 CLOSED。
+7. 如果仍有版本冲突或不能排除反例，输出阶段判断与下一步，并保持等待/暂停，不编造已解决结论。
 
-> **在时间、步骤、成本、权限和安全边界内，尽最大合理努力获得足够证据并回答客户问题。**
+## 3. 两个不能混淆的边界
 
----
+“只读”约束客户生产目标；系统必须能写自己的任务与报告，并向授权渠道发送答复。人工协助是补现场证据、执行工程师自行评估的建议或接手案件，不是批准小马哥重启/改配置的通道。
 
-## 2. 核心设计原则
+模型知识可以解释 Linux/网络机制并提出假设，但不能伪装成产品官方支持、现场真实结果或有出处的文档。动态证据裁决针对具体命题，不把“能安装成功”直接当成“官方支持”。
 
-### 2.1 Workflow First
+## 4. 能力如何扩展
 
-外层执行流程必须由显式 Workflow / State Graph 控制。
+Capability Registry 暴露可用能力；Workflow 配置允许阶段、优先级和条件；Policy 决定是否能在当前客户/设备/数据范围调用。新增提供方先实现 Adapter 和 Contract Test，再启用配置，不改 Core 私有厂商分支。
 
-确定性规则负责：
+Skill 的说明、脚本与资源经过审查及版本固定；临时脚本默认给人执行，本地验证也必须使用隔离测试环境。任意生产 shell 不是 V1 能力。
 
-- 状态转移
-- timeout
-- retry
-- max steps
-- max duration
-- permission
-- tool allowlist
-- token/cost budget
-- cancellation
-- termination condition
+## 5. 答案与报告
 
-LLM/Agent 只在适合语义推理的节点中工作，例如：
+简单答复：结论 → 必要步骤 → 引用 → 未确认事项。复杂调查自动生成 Markdown 报告，内容为问题/环境、观察证据、假设与验证、已排除项、当前结论、建议、执行风险、待办与来源。
 
-- 问题理解
-- Query rewrite
-- Evidence 语义判断
-- Hypothesis 生成
-- 下一调查动作建议
-- 回答与报告生成
+Chat 与 Admin 为两个业务面板，共用前端工程和后端权限。Chat 负责沟通/补证，Admin 配置连接、能力、工作流、主题与 HTML/Markdown 模板。报告可选择安全 HTML 导出，旧结果固定模板版本；新增交互页面通过构建期扩展。发布提供预构建镜像、在线配置包与按平台验证的离线包，部署端不需要开发工具链。
 
-### 2.2 Controlled Agentic Investigation
+报告必须区分建议执行与确实执行过的步骤，保留采集时间和产品版本。不能将 trace、模型内部思维链、凭证和原始客户秘密作为报告内容。下载与分享按 case 权限检查。
 
-允许 Agent 在明确边界内进行多步调查，但禁止无限自由 Agent Loop。
+## 6. 具体设计入口
 
-一次 Investigation 必须至少受到：
+| 需要了解 | 文档 |
+| --- | --- |
+| 问题理解、自主调查与答案检查 | [QA Core](../architecture/QA-CORE.md) |
+| 什么是好答案、如何评测 | [Answer Quality](../governance/ANSWER-QUALITY.md) |
+| 主流方案、热度及取舍 | [选型审计](../research/2026-09-05-STACK-AUDIT.md) |
+| 组件分工与部署 | [Architecture](../architecture/ARCHITECTURE-BASELINE.md) |
+| 持久任务/并发/恢复 | [Task Model](../architecture/SESSION-EVENT-MODEL.md) |
+| 配置、升级能力与失败路径 | [Workflow](../architecture/WORKFLOW-MODEL.md) |
+| 知识引用与来源裁决 | [Knowledge Contract](../architecture/KNOWLEDGE-CONTRACT.md) |
+| 插件、MCP/Skill 与只读策略 | [Plugin Contract](../architecture/PLUGIN-CONTRACT.md) |
+| 分阶段实现与验收 | [Delivery Plan](../plans/V1-DELIVERY-PLAN.md) |
+| 双面板、个性化与交付 | [Web](../architecture/WEB-CONSOLE.md)、[模板](../architecture/PRESENTATION-CONTRACT.md)、[分发部署](../architecture/DISTRIBUTION-DEPLOYMENT.md) |
+| 是否可进入编码 | [就绪判断与 Codex 交接](../plans/IMPLEMENTATION-READINESS.md) |
 
-```text
-max_steps
-max_duration
-tool_allowlist
-permission
-provider_timeout
-retry_limit
-token/cost_budget
-termination_condition
-```
-
-约束。
-
-### 2.3 Evidence First
-
-Knowledge、API、Tool 返回的信息统一转换成 Evidence。
-
-任何重要结论应能反查其 Evidence；证据不足时必须显式说明不确定性，不得把 Provider 故障或无结果伪装成确定答案。
-
-### 2.4 Everything External Through Contract
-
-以下外部能力必须通过稳定 Contract / Plugin 接入：
-
-- Channel
-- Knowledge
-- Model
-- Tool
-- Policy
-
-核心 Workflow 不认识 Dify、RAGFlow、DingTalk、某个具体模型 SDK 或某个产品 API 的私有类型。
-
-### 2.5 Provider Neutral
-
-替换 xmg-kb、Dify、RAGFlow、LLM、Channel 或 Tool Provider，不应要求修改 Harness Core。
-
----
-
-## 3. 总体架构
-
-```text
-                   Customer / Engineer
-                           |
-               DingTalk / REST / Web
-                           |
-                     Channel Adapter
-                           |
-                           v
-                    Harness Gateway
-                           |
-               Session / Auth / Policy
-                           |
-                           v
-                    Support Workflow
-                           |
-             +-------------+-------------+
-             |                           |
-             v                           v
-       Initial Knowledge           Investigation
-          Retrieval                   Loop
-             |                           |
-             |                 +---------+---------+
-             |                 |         |         |
-             |                 v         v         v
-             |               KB/API     MCP      Tools
-             |                 |         |         |
-             +-----------------+---------+---------+
-                               |
-                               v
-                        Evidence Workspace
-                               |
-                    Hypothesis / Verify / Reason
-                               |
-                    Evidence sufficient?
-                         |             |
-                        YES            NO
-                         |             |
-                         |        continue / ask user
-                         |        / controlled fallback
-                         v
-                 Answer / Technical Report
-```
-
-跨层能力：
-
-```text
-Config / Secrets / Trace / Metrics / Audit
-Retry / Timeout / Circuit Breaker / Rate Limit
-```
-
----
-
-## 4. Support Workflow
-
-推荐的核心状态流程：
-
-```text
-receive_input
-      |
-normalize_input
-      |
-policy_check
-      |
-understand_problem
-      |
-initial_retrieve
-      |
-evaluate_evidence
-      |
-      +---- sufficient --------------------+
-      |                                    |
-      |                                    v
-      |                               generate_answer
-      |                                    |
-      |                                    v
-      |                              verify_grounding
-      |                                    |
-      |                                    v
-      |                                 finalize
-      |
-      +---- insufficient ---> plan_next_action
-                                  |
-                                  v
-                            execute_action
-                                  |
-                                  v
-                           collect_evidence
-                                  |
-                                  v
-                         verify / update hypothesis
-                                  |
-                                  v
-                              continue?
-                            /          \
-                          YES          NO
-                           |            |
-                           +------> generate answer/report
-```
-
-每一步必须有可观测事件和明确失败路径。
-
----
-
-## 5. Investigation 模型
-
-复杂问题使用 Investigation 表达整个调查过程。
-
-建议稳定领域模型：
-
-```text
-Thread
-  └── Turn
-       └── Investigation
-            ├── InvestigationStep[]
-            ├── Evidence[]
-            ├── Hypothesis[]
-            ├── ToolRequest[]
-            ├── ToolResult[]
-            └── Decision[]
-```
-
-### InvestigationStep
-
-每一步至少记录：
-
-- action
-- capability/provider
-- input
-- output reference
-- evidence ids
-- latency
-- retry count
-- result status
-- reason for next decision
-
-这样可以完整复盘“为什么得到这个答案”。
-
----
-
-## 6. Evidence 模型
-
-统一 Evidence 至少包含：
-
-```text
-evidence_id
-content
-title
-source
-uri
-provider_id
-document_or_resource_id
-chunk_or_result_id
-score/confidence
-metadata
-knowledge_or_tool_version
-timestamp
-```
-
-Evidence 来源可以是：
-
-- xmg-kb 文档片段
-- 其他知识库
-- 产品 REST API
-- MCP Tool
-- Linux/容器/集群诊断结果
-- 第三方产品状态
-- 用户补充信息
-
-不同 Provider 的 score 不允许直接假设可比较；跨 Provider 排序时需要标准化或 rerank。
-
----
-
-## 7. Capability / Plugin Architecture
-
-稳定能力类别：
-
-```text
-KnowledgeProvider
-ModelProvider
-ToolProvider
-ChannelProvider
-PolicyProvider
-```
-
-Harness 通过 Capability Registry 发现能力。
-
-Workflow 或 Agent 只能根据 Contract 和 capability 选择能力，禁止出现：
-
-```text
-if provider == "dify":
-...
-elif provider == "ragflow":
-...
-```
-
-这种 Provider 私有业务逻辑。
-
----
-
-## 8. xmg-kb 的边界
-
-`xmg-kb` 是独立知识工程项目和知识源，不属于 xmg-qa2 内部模块。
-
-```text
-Raw Documents
-   |
-Parse / Clean / Deduplicate / Classify / Chunk / Index
-   |
-   v
-xmg-kb
-   |
-Knowledge Contract
-   |
-   v
-xmg-qa2
-```
-
-xmg-qa2 不负责：
-
-- PDF/PPT/Word 原始解析
-- OCR
-- 文档清洗
-- 去重
-- 分类
-- 切片
-- Embedding 批处理
-- 知识库构建
-
-xmg-qa2 只消费已发布的 Knowledge Contract，并记录 knowledge version。
-
----
-
-## 9. Tool 与产品 API
-
-产品 API、MCP、诊断工具统一视为 Tool/Capability。
-
-工具至少声明：
-
-```text
-capability
-description
-input_schema
-output_schema
-side_effect_level
-required_permission
-timeout
-retry_policy
-```
-
-### 工具风险分级
-
-建议至少区分：
-
-- `READ_ONLY`：查询状态、读取日志、获取配置。
-- `CONTROLLED_WRITE`：有限配置修改，需要明确 Policy。
-- `HIGH_RISK`：重启、删除、升级、破坏性操作，默认要求人工审批。
-
-V1 优先实现只读诊断工具链路。
-
----
-
-## 10. 错误模型
-
-外部 Provider 错误必须映射为稳定错误类型：
-
-```text
-NoResult
-ConfigurationError
-AuthenticationError
-PermissionDenied
-TimeoutError
-RateLimitError
-ProviderUnavailable
-InvalidResponse
-ContractViolation
-ToolExecutionFailed
-```
-
-关键规则：
-
-> `ProviderUnavailable` 绝不能被转换成 `NoResult`。
-
-这样才能区分“没有相关知识”和“知识库其实挂了”。
-
----
-
-## 11. 输出模型
-
-### 简单问题
-
-直接输出：
-
-- 结论
-- 关键步骤/建议
-- Evidence/Citation
-- 必要风险提示
-
-### 复杂问题
-
-自动生成 Technical Report，至少包含：
-
-1. 问题描述
-2. 环境与上下文
-3. 调查过程
-4. 关键 Evidence
-5. Hypothesis 与验证结果
-6. 根因/当前判断
-7. 解决方案
-8. 风险与限制
-9. 后续建议
-10. Evidence / Source References
-
----
-
-## 12. 可观测性
-
-每一次问题处理至少可以关联：
-
-```text
-trace_id
-thread_id
-turn_id
-investigation_id
-workflow_id
-workflow_version
-step_id
-provider_id
-operation_id
-latency
-retry_count
-token/cost
-evidence_ids
-final_outcome
-```
-
-目标是让运维人员可以回答：
-
-> Agent 为什么调用这个工具、它拿到了什么证据、为什么继续调查、为什么最终停止、最终结论依据是什么？
-
----
-
-## 13. Runtime 与 LangGraph 边界
-
-LangGraph 仅作为 Workflow Runtime Engine。
-
-不得进入稳定领域模型和 Provider Contract。
-
-原则：
-
-```text
-domain
-  ^
-harness/contracts
-  ^
-workflows + runtime
-  ^
-plugins + infrastructure
-  ^
-api + channels
-```
-
-禁止：
-
-```text
-domain -> langgraph
-domain -> fastapi
-workflow -> concrete provider SDK
-contracts -> provider implementation
-```
-
-未来即使替换 Workflow Engine，也不应破坏 Domain 和 Plugin Contract。
-
----
-
-## 14. V1 范围
-
-第一阶段只验证核心架构闭环：
-
-- Thread / Turn / Investigation
-- Evidence / Hypothesis
-- Stable Provider Contracts
-- Capability Registry
-- Core Support Workflow
-- Controlled Agentic Investigation
-- Fake Knowledge Provider
-- Fake Tool Provider
-- Fake Model Provider
-- 最小 API
-- Trace / Audit 基线
-- Unit / Contract / Workflow / Integration / E2E Tests
-
-### V1 不包含
-
-- 真实 xmg-kb 接入
-- DingTalk 生产接入
-- 真实产品 API
-- 高风险自动执行工具
-- 知识清洗平台
-- 通用 Multi-Agent Supervisor
-- 大型管理后台
-
----
-
-## 15. 后续 Feature 建议顺序
-
-```text
-001 Core Support Harness
-        |
-002 xmg-kb Knowledge Provider
-        |
-003 Tool / Product API Runtime
-        |
-004 Expert Investigation Workflow Enhancement
-        |
-005 Technical Report Generation
-        |
-006 DingTalk Channel
-        |
-007 Evaluation / Observability / Production Hardening
-```
-
-每个 Feature 独立执行完整 Spec Kit 生命周期，避免把整个产品塞入一个巨大 Spec。
-
----
-
-## 16. SpecKit 开发门禁
-
-```text
-Constitution
-  -> Specify
-  -> Clarify
-  -> Plan
-  -> Checklist
-  -> Tasks
-  -> Analyze
-  -> HUMAN CODING GATE
-  -> Implement
-  -> Verify
-  -> Converge
-  -> PR
-  -> CI / Review
-  -> Squash Merge
-```
-
-正式编码前必须达到：
-
-```text
-Critical = 0
-High = 0
-```
-
-并获得人工明确授权。
-
----
-
-## 17. 一句话架构定义
-
-> **xmg-qa2 = XMG Harness + Deterministic Support Workflow + Controlled Agentic Investigation + Evidence Workspace + Pluggable Knowledge/API/Tool Providers。**
-
-Agent 可以主动调查，但 Runtime 必须可控；能力可以持续扩展，但必须通过稳定 Contract；结论可以复杂，但必须有 Evidence。
+本轮解决的是设计冲突。真实 KB、钉钉、工具、并发和恢复能力尚须按计划实现和验收，不以文档完成代替软件完成。
