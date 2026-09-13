@@ -44,6 +44,7 @@
   * [AI Coding](ai/coding/README.md)
     * [FDE 60 天技能表](ai/coding/fde-skills-roadmap.md)
     * [ChatGPT 与 Codex](ai/coding/chatgpt-codex.md)
+    * [Codex 与 Claude Code 多渠道、多 API Key、多模型切换速查](ai/coding/codex-claude-multi-provider-switching.md)
     * [Vibe Coding](ai/coding/vibe-coding.md)
     * [Codex 项目开局规范](ai/coding/codex-project-bootstrap.md)
   * [Skills 与插件](ai/skills-plugins.md)
