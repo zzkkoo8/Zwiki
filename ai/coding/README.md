@@ -6,6 +6,7 @@ AI Coding 关注如何用 Coding Agent 完成软件开发工作，包括需求�
 
 - [FDE 60 天技能表](fde-skills-roadmap.md)：每天 1 小时，从零基础按顺序训练 AI 协作、Git、Web、UI/UX、React、FastAPI、数据库、全栈交付、Agent 与客户现场能力；每项都包含可验收任务和在线学习资源。
 - [ChatGPT 与 Codex](chatgpt-codex.md)：ChatGPT 的研究、搜索、Deep Research、Plugin / Skill 用法，以及 Codex 的仓库操作、`AGENTS.md`、Skill、审查和协同开发流程。
+- [Codex 与 Claude Code 多渠道、多 API Key、多模型切换速查](codex-claude-multi-provider-switching.md)：Linux 开发机下的 Profile / Settings、API Key、模型、推理强度和权限组合，以及常用启动命令。
 - [Vibe Coding](vibe-coding.md)：把 Coding Agent 纳入完整开发流程，通过分阶段门禁、真实验证和 Git 回退实现稳定交付。
 - [Codex 项目开局规范](codex-project-bootstrap.md)：新项目开工前的 AI 友好技术栈、最小目录结构、必备 Markdown 文件模板，以及 GitHub Flow + Spec Kit 开局基线。
 
@@ -28,7 +29,6 @@ AI Coding 关注如何用 Coding Agent 完成软件开发工作，包括需求�
 
 ## 后续收录方向
 
-- Codex CLI 配置与渠道切换
 - Claude Code / Cursor 实战
 - 多 Agent 协作
 - 上下文与 Memory 管理
