@@ -1,60 +1,71 @@
 # Zwiki
 
-> 面向日常学习、部署实践和故障处理的个人技术知识库。
+> 面向常见运维、产品部署和技术问题的**快速实施方案库**。
 
 - 📖 在线 Wiki：<https://zwiki.gitbook.io/zwiki-docs>
 - 💻 GitHub：<https://github.com/zzkkoo8/Zwiki>
 - 📦 Clone：`git clone https://github.com/zzkkoo8/Zwiki.git`
 
-这里记录公开组件的可复用技术文章。内容按产品或技术领域组织；安装、配置、运维和故障排查等文章放在各自领域内，避免不同技术栈相互混杂。
+Zwiki 不重写官方手册。每篇文章优先回答：**现在该执行什么、怎么判断成功、失败后先查哪里。** 完整参数、原理和版本矩阵直接链接官方文档。
 
-GitHub `main` 是 Zwiki 的唯一事实源（SSOT），GitBook 负责同步、展示和公网发布。
+GitHub `main` 是唯一事实源（SSOT），GitBook 负责同步、搜索和发布。
 
 ```text
-ChatGPT / Codex / 人工维护
-            ↓
-      GitHub Zwiki
-      唯一事实源
-            ↓
-       GitBook Sync
-            ↓
-      公网技术 Wiki
+人工 / ChatGPT / Codex
+        ↓
+   GitHub main
+        ↓
+   GitBook Sync
+        ↓
+      Zwiki
 ```
 
 ## 快速入口
 
 | 分类 | 主要内容 |
 | --- | --- |
-| [基建](infrastructure/README.md) | 硬件、系统、网络、基础服务与通用运维 |
-| [容器与云原生](cloud-native/README.md) | Docker、Kubernetes、K3s 的部署、运维与排障 |
-| [开发](development/README.md) | 工程平台、前后端技术栈、测试与开发工具 |
-| [AI](ai/README.md) | AI Coding、Vibe Coding、Skills、插件、模型接入、提示词与 AI 资源 |
-| [项目](projects/README.md) | 持续维护项目的目标、架构、设计决策与实施文档 |
-| [Zwiki 使用与维护](wiki-ops/README.md) | 日常维护、写入前检查、错误回退、文章规范和模板 |
+| [基建](infrastructure/README.md) | Linux、网络、Nginx、硬件和常用运维 |
+| [容器与云原生](cloud-native/README.md) | Docker、Kubernetes、K3s、K9s、Helm |
+| [开发](development/README.md) | GitHub、开发工具和工程平台 |
+| [AI](ai/README.md) | Codex、Claude Code、Vibe Coding、模型和 Skills |
+| [项目](projects/README.md) | 项目设计、实施记录和自动镜像 |
+| [Zwiki 使用与维护](wiki-ops/README.md) | 写入、修改、回退和文章规范 |
+
+## 文章默认结构
+
+```text
+结论 / 最短路径
+        ↓
+可复制命令或配置
+        ↓
+验证方法
+        ↓
+常见异常分支
+        ↓
+必要风险和回退
+        ↓
+官方资料链接
+```
 
 ## 内容原则
 
-- 一级目录按技术领域组织，二级目录按主题组织，具体文章原则上不超过三级导航。
-- 同一内容只保留一个权威页面，跨分类通过链接引用，不复制维护。
-- 一级目录只在存在实际内容时创建，避免空目录和过度设计。
-- 一篇文章聚焦一个问题，标题直接说明目标或故障现象。
-- 命令应可复制执行，并写明预期输出、判断标准和风险。
-- 涉及变更的文章应提供验证方法；存在风险时应提供回退方案。
-- 标明适用版本、验证状态和最后验证日期，避免陈旧内容被误用。
-- 只记录可以公开的组件知识，不提交账号、密钥、客户信息或内部敏感资料。
+- 一篇文章解决一个明确场景，标题直接说明要做什么或排查什么。
+- 开头先给最常用、最短、可落地的方案，不先讲大段背景。
+- 命令和配置尽量做到复制即可改参数使用。
+- 同一知识只保留一个权威页面，其他页面用链接引用。
+- 官方已经写得很完整的内容不复制，只记录 Zwiki 场景需要的部分并给官方链接。
+- 变更操作必须说明验证方式；高风险操作必须说明影响或回退入口。
+- 真实案例可保留必要现场证据；产品部署清单可保留完整验收项，不为追求短而删关键步骤。
+- 不提交密码、Token、私钥、客户信息或未脱敏现场数据。
 
-## 使用与维护
+## 修改
 
-- AI Agent 操作规则见 [`AGENTS.md`](AGENTS.md)。
-- 日常增删改和目录选择见 [Zwiki 日常维护指南](wiki-ops/daily-operations.md)。
-- 修改前执行 [写入前检查](wiki-ops/write-checklist.md)。
-- 文章格式与质量遵循 [文章编写规范](CONTRIBUTING.md)。
-- 写错后按 [错误回退与恢复](wiki-ops/rollback-guide.md) 操作。
+GitBook 页面右上角 Page Actions 已启用 **Edit on GitHub**，可直接进入对应 Markdown 源文件。
 
-## 编写文章
+维护规则：
 
-新增或修改文章时，从以下模板选择最接近的一种：
-
-- [通用技术文章模板](templates/technical-article.md)
-- [故障排查模板](templates/troubleshooting.md)
-- [部署指南模板](templates/deployment-guide.md)
+- [Zwiki 快速修改](wiki-ops/quick-edit-and-feedback.md)
+- [写入前检查](wiki-ops/write-checklist.md)
+- [文章编写规范](CONTRIBUTING.md)
+- [错误回退与恢复](wiki-ops/rollback-guide.md)
+- AI Agent 规则：[`AGENTS.md`](AGENTS.md)
