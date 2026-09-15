@@ -227,20 +227,12 @@ ansible-playbook -i inventory.ini check.yml
 
 ## 6. Windows 最简批量命令
 
-Windows 11 自带 OpenSSH Client 的情况下，PowerShell 可以直接循环：
+Windows 11 自带 OpenSSH Client 的情况下，PowerShell 可以直接使用 SSH。
+
+先生成 10 台主机列表：
 
 ```powershell
-$hosts = '192.168.1.101'..'192.168.1.110'
-```
-
-IP 最后一段不适合直接用字符串范围生成，实际使用建议保存 `hosts.txt`：
-
-```text
-192.168.1.101
-192.168.1.102
-192.168.1.103
-...
-192.168.1.110
+101..110 | ForEach-Object { "192.168.1.$_" } | Set-Content .\hosts.txt
 ```
 
 顺序执行：
