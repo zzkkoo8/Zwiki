@@ -159,7 +159,9 @@ ansible linux \
 
 ## 5. 每台密码不同
 
-`-k` 只能方便地处理一批共用密码的主机。每台密码不同，可临时写入 Inventory：
+`-k` 适合一批主机共用同一个 SSH 密码。每台密码不同，再单独创建一个**临时密码 Inventory**，不要污染长期使用的 `inventory.ini`。
+
+`inventory-password.ini`：
 
 ```ini
 [linux]
@@ -168,27 +170,34 @@ node02 ansible_host=192.168.1.102 ansible_user=root ansible_password=CHANGE_ME_0
 node03 ansible_host=192.168.1.103 ansible_user=root ansible_password=CHANGE_ME_03
 ```
 
+普通用户 sudo 密码也可临时增加：
+
+```ini
+node01 ansible_host=192.168.1.101 ansible_user=ops ansible_password=CHANGE_ME_01 ansible_become_password=CHANGE_ME_SUDO_01
+```
+
 保护文件：
 
 ```bash
-chmod 600 inventory.ini
+chmod 600 inventory-password.ini
 ```
 
-此时执行命令不需要 `-k`：
+指定这个临时 Inventory 执行：
 
 ```bash
 ansible linux \
+  -i inventory-password.ini \
   -m ansible.builtin.raw \
   -a 'hostname; uptime'
 ```
 
-任务完成后删除或清理密码：
+任务完成后删除：
 
 ```bash
-rm -f inventory.ini
+rm -f inventory-password.ini
 ```
 
-如果配置需要长期保存，不要长期明文保存 `ansible_password`，改用 `ansible-vault`。
+如果密码配置需要长期保存，不要长期明文保存 `ansible_password` / `ansible_become_password`，改用 `ansible-vault`。
 
 ## 6. 目标机没有 Python
 
