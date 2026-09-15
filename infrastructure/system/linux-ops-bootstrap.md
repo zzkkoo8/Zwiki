@@ -29,6 +29,38 @@ ip route
 systemctl --failed
 ```
 
+### 一键采集当前状态和部署业务
+
+需要快速摸清一台陌生 Linux 主机时，优先使用附件脚本生成一份 Markdown 报告：
+
+- [collect-linux-host-info.sh](assets/linux-ops-bootstrap/collect-linux-host-info.sh)
+
+生产机建议先下载、做 Bash 语法检查，再执行：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zzkkoo8/Zwiki/main/infrastructure/system/assets/linux-ops-bootstrap/collect-linux-host-info.sh -o /tmp/collect-linux-host-info.sh \
+  && bash -n /tmp/collect-linux-host-info.sh \
+  && sudo bash /tmp/collect-linux-host-info.sh \
+  | tee "linux-host-info-$(hostname)-$(date +%F-%H%M).md"
+```
+
+没有 `sudo` 权限时直接用当前用户执行即可，但监听端口、容器、LVM 等信息可能不完整。
+
+脚本默认只读，主要采集：
+
+- 系统、内核、运行时间和负载；
+- CPU、内存、磁盘、文件系统和 LVM；
+- 网卡、路由、DNS、监听端口；
+- 失败服务、正在运行的 systemd 服务；
+- CPU / 内存占用最高的进程；
+- Docker、Podman、nerdctl、CRI 容器；
+- K3s / Kubernetes 节点与 Pod、Helm Release；
+- Nginx、HAProxy、Redis、MySQL、PostgreSQL、Java、Python、Go 等常见组件版本。
+
+这些信息通常足够快速判断**主机当前状态、容器/集群环境以及部署了哪些业务**。脚本不会主动提权，也不会读取密码、Token、Cookie、私钥、进程环境变量、Kubernetes Secret、业务配置正文或原始日志正文。
+
+> 采集报告会包含主机名、IP、端口、服务名、容器名和镜像名。发送给外部人员或 AI 前先检查并脱敏。
+
 ## 2. CPU、内存、进程
 
 实时：
