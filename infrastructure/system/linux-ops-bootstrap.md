@@ -1,6 +1,6 @@
 # Linux 运维开局速查
 
-接手、新装或临时排查 Linux 主机时，先用最少命令确认：**系统是谁、资源够不够、网络通不通、服务有没有挂、磁盘是否异常。**
+接手、新装或临时排查 Linux 主机时，先用最少命令确认：**系统是谁、资源够不够、网络通不通、服务有没有挂、磁盘是否异常。本指南只为快速检查主机情况。**
 
 ## 1. 先跑这一组
 
@@ -263,7 +263,7 @@ sudo dnf install <package>
 
 ## 9. 新主机建议固定检查顺序
 
-```text
+```
 系统版本
   ↓
 CPU / 内存 / Load
@@ -281,8 +281,8 @@ SSH 与运维账号
 
 ## 官方资料
 
-- iproute2：https://www.kernel.org/pub/linux/utils/net/iproute2/
-- systemd：https://systemd.io/
-- OpenSSH：https://www.openssh.com/manual.html
-- Ubuntu Server：https://documentation.ubuntu.com/server/
-- Red Hat Enterprise Linux：https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/
+* iproute2：https://www.kernel.org/pub/linux/utils/net/iproute2/
+* systemd：https://systemd.io/
+* OpenSSH：https://www.openssh.com/manual.html
+* Ubuntu Server：https://documentation.ubuntu.com/server/
+* Red Hat Enterprise Linux：https://docs.redhat.com/en/documentation/red\_hat\_enterprise\_linux/
