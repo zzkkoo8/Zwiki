@@ -7,6 +7,7 @@
     * [服务器双分区启动 U 盘](infrastructure/hardware/bootable-usb-fat32-exfat.md)
   * [系统](infrastructure/system/README.md)
     * [Linux 运维开局常用命令](infrastructure/system/linux-ops-bootstrap.md)
+    * [Windows / Linux / macOS 批量运维 Linux 主机速查](infrastructure/system/linux-batch-operations.md)
     * [Linux 性能故障快速排查](infrastructure/system/linux-performance-troubleshooting.md)
     * [systemd 与日志运维速查](infrastructure/system/linux-systemd-log-operations.md)
     * [Linux 在线/离线软件包管理速查](infrastructure/system/linux-offline-package-management.md)
