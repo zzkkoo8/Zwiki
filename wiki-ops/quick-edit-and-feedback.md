@@ -4,7 +4,7 @@ Zwiki 以 **GitHub `main` 为唯一事实源**。阅读在 GitBook，修改最�
 
 ## 最快入口：Edit on GitHub
 
-GitBook 在启用 Git Sync 后原生支持 **Edit on GitHub/GitLab** 页面操作。开启后，读者在任意页面都能直接跳到该页面对应的 GitHub 源文件，不需要每篇 Markdown 手工维护“编辑本文”链接。
+Zwiki 当前已启用 GitBook 的 **Edit on GitHub/GitLab** Page Action。读者可以从页面操作菜单直接进入该页面对应的 GitHub 源文件，不需要每篇 Markdown 手工维护“编辑本文”链接。
 
 GitBook 设置路径：
 
@@ -14,11 +14,7 @@ Docs site
   → Configure
   → Page actions
   → Edit on GitHub/GitLab
-  → Enable
-  → Save
 ```
-
-Zwiki 已使用 GitHub Git Sync，因此应优先启用这个站点级入口。
 
 官方说明：
 
