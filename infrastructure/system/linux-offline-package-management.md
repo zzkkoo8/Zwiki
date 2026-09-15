@@ -1,383 +1,295 @@
-# Linux 在线/离线软件包管理速查
+# Linux 离线软件安装速查
 
-用于内网、隔离网主机安装常用软件时，先确认系统和架构，再在匹配的联网环境下载软件及依赖，校验后离线安装。不要仅凭“看起来像 CentOS/Ubuntu”混装软件包。
+用于内网、隔离网 Linux 安装常用软件。最稳妥的方法只有一条：**在与目标机同发行版、同大版本、同架构的联网环境下载软件和全部依赖，再整体复制到内网安装。**
 
-## 快速处理
-
-### 目标机先确认系统
+## 1. 目标机先确认系统
 
 ```bash
 cat /etc/os-release
 uname -m
-rpm --eval '%{_arch}' 2>/dev/null || true
-dpkg --print-architecture 2>/dev/null || true
 ```
 
-再确认当前包管理器：
+再确认包管理器：
 
 ```bash
 command -v dnf
 command -v yum
-command -v rpm
 command -v apt-get
+command -v rpm
 command -v dpkg
 ```
 
-必须至少匹配：
+必须匹配：
 
 ```text
-发行版/兼容生态 + 大版本 + CPU 架构 + 软件包格式 + 依赖仓库
+发行版/兼容生态 + 大版本 + CPU 架构 + 软件包格式 + 软件源
 ```
 
-推荐在**与目标机同发行版、同大版本、同架构**的联网主机、虚拟机或 chroot/container 环境下载依赖，然后整体搬入内网。
+不要把不同发行版的 RPM/DEB 混装，也不要因为“都是 RPM”就跨版本强装。
 
-## 必须知道
+## 2. RPM 系：下载软件和全部依赖
 
-- **RPM 与 DEB 不能混装**：RHEL/Rocky/CentOS/部分麒麟使用 RPM 生态；Ubuntu/Debian 使用 DEB。
-- **包格式相同也不代表兼容**：glibc、OpenSSL、Python、systemd 等基础依赖版本不同，仍可能安装失败或运行异常。
-- **DNF/APT 负责依赖解析，rpm/dpkg 更底层**：离线安装优先让高层包管理器读取本地包并检查依赖，不建议无视依赖强装。
-- **麒麟 V10 等兼容发行版**：必须以目标机 `/etc/os-release` 的 `ID`、`ID_LIKE`、版本、仓库和架构为准，不能简单按“CentOS 7/8”猜测。
+适用于 RHEL、Rocky、CentOS、部分麒麟等 RPM 生态。
 
-## 1. RPM 系：查询与验证
-
-查看系统：
+联网机安装下载工具：
 
 ```bash
-cat /etc/os-release
-rpm --eval '%{_arch}'
-rpm --version
+sudo dnf install -y dnf-plugins-core
 ```
 
-查看包是否安装：
-
-```bash
-rpm -q <package>
-rpm -qa | grep -i <keyword>
-```
-
-查看包信息：
-
-```bash
-rpm -qi <package>
-rpm -qf /path/to/file
-```
-
-查看本地 RPM 元数据：
-
-```bash
-rpm -qpi ./package.rpm
-rpm -qpR ./package.rpm
-```
-
-校验 RPM 签名/摘要：
-
-```bash
-rpm -K ./package.rpm
-```
-
-另外建议对交付目录保存 SHA-256：
-
-```bash
-sha256sum *.rpm > SHA256SUMS
-sha256sum -c SHA256SUMS
-```
-
-## 2. RPM 系：联网侧下载软件和依赖
-
-### DNF 环境
-
-安装下载插件（不同发行版包名可能有差异）：
-
-```bash
-dnf install dnf-plugins-core
-```
-
-创建目录：
+下载常用软件及依赖：
 
 ```bash
 mkdir -p /tmp/offline-rpms
+
+dnf download \
+  --resolve \
+  --alldeps \
+  --destdir /tmp/offline-rpms \
+  tmux rsync python3
 ```
 
-下载目标包及依赖：
+旧 YUM 环境可使用：
 
 ```bash
-dnf download --resolve --alldeps --destdir /tmp/offline-rpms <package>
-```
-
-如果目标系统启用了特定 repo，联网下载环境也必须使用相同或兼容 repo。先确认：
-
-```bash
-dnf repolist
-dnf info <package>
-```
-
-### 旧 YUM 环境
-
-部分系统使用 `yum-utils` 提供 `yumdownloader`：
-
-```bash
-yum install yum-utils
+sudo yum install -y yum-utils
 mkdir -p /tmp/offline-rpms
-yumdownloader --resolve --destdir=/tmp/offline-rpms <package>
+
+yumdownloader \
+  --resolve \
+  --destdir=/tmp/offline-rpms \
+  tmux rsync python3
 ```
-
-在实际发行版中先确认命令是否存在，不要为了使用某条文档命令强行替换系统包管理器。
-
-## 3. RPM 系：离线安装
-
-将整个 RPM 目录复制到目标机后先校验：
-
-```bash
-cd /path/to/offline-rpms
-sha256sum -c SHA256SUMS
-rpm -K ./*.rpm
-```
-
-有 DNF 时优先：
-
-```bash
-dnf install ./*.rpm
-```
-
-旧 YUM：
-
-```bash
-yum localinstall ./*.rpm
-```
-
-如果依赖不完整，先回联网侧补齐，不建议使用 `rpm --nodeps` 绕过依赖检查。
-
-查看历史（系统支持时）：
-
-```bash
-dnf history
-yum history
-```
-
-安装后验证：
-
-```bash
-rpm -q <package>
-<command> --version
-```
-
-## 4. Debian / Ubuntu：查询与验证
-
-系统和架构：
-
-```bash
-cat /etc/os-release
-dpkg --print-architecture
-```
-
-已安装包：
-
-```bash
-dpkg -l | grep -i <keyword>
-apt-cache policy <package>
-```
-
-查看 DEB 信息和依赖：
-
-```bash
-dpkg-deb -I ./package.deb
-```
-
-检查包数据库状态：
-
-```bash
-dpkg --audit
-```
-
-无输出通常表示没有发现半安装/未配置完成的软件包。
-
-## 5. Debian / Ubuntu：联网侧下载
-
-### 只下载单个包
-
-```bash
-apt-get download <package>
-```
-
-这只下载指定包，不等价于打包完整依赖。
-
-### 下载安装所需依赖
-
-最稳妥方式是在与目标机**同 Ubuntu/Debian 版本、同架构、相同软件源状态**的干净环境中执行下载。
-
-先更新索引：
-
-```bash
-sudo apt-get update
-```
-
-创建专用缓存目录：
-
-```bash
-mkdir -p /tmp/offline-debs/partial
-```
-
-仅下载、不安装：
-
-```bash
-sudo apt-get -o Dir::Cache::archives=/tmp/offline-debs --download-only install <package>
-```
-
-注意：APT 会根据下载机当前已安装状态解析依赖。如果要建立可复用离线库，最好使用干净 VM/chroot/container，确保环境与目标机一致，避免某些依赖因下载机已安装而没有被保存。
 
 生成校验：
 
 ```bash
-cd /tmp/offline-debs
-sha256sum ./*.deb > SHA256SUMS
+cd /tmp/offline-rpms
+sha256sum *.rpm > SHA256SUMS
 ```
 
-## 6. Debian / Ubuntu：离线安装
-
-复制目录后：
+复制整个目录到内网主机后：
 
 ```bash
-cd /path/to/offline-debs
+cd /path/to/offline-rpms
 sha256sum -c SHA256SUMS
 ```
 
-APT 可用时优先让它解析本地包：
+优先使用 DNF/YUM 做本地依赖检查：
 
 ```bash
-sudo apt install ./*.deb
+sudo dnf install ./*.rpm
 ```
 
-如果完全没有可用仓库且本地依赖已全部准备好，也可以：
+旧系统：
 
 ```bash
-sudo dpkg -i ./*.deb
+sudo yum localinstall ./*.rpm
 ```
 
-随后检查：
-
-```bash
-dpkg --audit
-apt-cache policy <package>
-<command> --version
-```
-
-如果 `dpkg -i` 报依赖缺失，不要直接执行会联网的修复命令；先记录缺失依赖，在联网侧补齐对应 DEB。
-
-## 7. 麒麟 V10 / 国产 RPM 系统
-
-先采集：
-
-```bash
-cat /etc/os-release
-uname -m
-rpm --eval '%{_arch}'
-rpm -E '%{rhel}' 2>/dev/null || true
-dnf repolist 2>/dev/null || yum repolist 2>/dev/null
-```
-
-重点看：
-
-```text
-ID
-ID_LIKE
-VERSION_ID
-架构（x86_64/aarch64 等）
-已启用仓库
-基础库版本
-```
-
-原则：
-
-1. 优先使用同版本麒麟官方仓库或企业内镜像源。
-2. 其次使用已经在该系统实测过的兼容仓库。
-3. 不因为 `rpm` 包能解包，就认为 RHEL/CentOS/Rocky 的任意版本 RPM 都可直接安装。
-4. Python、OpenSSL、glibc、kernel、systemd 等基础组件尤其不能跨发行版盲装。
-
-## 8. 安装前统一检查清单
-
-```text
-□ /etc/os-release 已记录
-□ CPU 架构一致
-□ 软件包格式正确（RPM/DEB）
-□ 软件版本适配目标系统
-□ 依赖包来自相同或兼容仓库
-□ SHA-256 校验通过
-□ RPM 包签名/摘要检查通过（RPM 场景）
-□ 已确认安装是否会升级/替换系统关键依赖
-□ 有回退包或快照/备份
-```
-
-查看 RPM 安装计划时，不确认前不要输入 `y`；DNF/YUM 会展示将安装、升级或移除的包。
-
-Ubuntu/Debian 同理，先看 APT 计划：
-
-```bash
-apt-get -s install ./package.deb
-```
-
-## 9. 安装失败如何处理
-
-### RPM
-
-查看依赖：
-
-```bash
-rpm -qpR ./package.rpm
-```
-
-查看事务历史：
-
-```bash
-dnf history 2>/dev/null || yum history 2>/dev/null
-```
-
-不要把下面命令作为常规修复：
+不要把下面命令作为常规方案：
 
 ```text
 rpm --nodeps
 rpm --force
 ```
 
-它们会绕过依赖或覆盖保护，容易把系统留在不可维护状态。
+## 3. Debian / Ubuntu：下载软件和依赖
 
-### DEB
-
-```bash
-dpkg --audit
-dpkg -l | grep '^..r\|^..U\|^..F\|^..H'
-tail -n 100 /var/log/dpkg.log
-```
-
-有联网仓库时可按 APT 提示修复依赖；隔离网环境应先把缺失包补齐再继续。
-
-## 回退
-
-软件安装/升级前先确认旧版本包是否可获得。涉及系统关键组件时优先做虚拟机快照、系统备份或在测试机验证。
-
-RPM 系可通过历史确认事务：
+联网机先更新索引：
 
 ```bash
-dnf history
+sudo apt-get update
 ```
 
-不要假设所有事务都能安全自动 `undo`；内核、数据库、配置迁移等需按组件自己的回退流程处理。
-
-Debian/Ubuntu 可通过：
+创建独立缓存目录：
 
 ```bash
-apt-cache policy <package>
+sudo mkdir -p /tmp/offline-debs/partial
 ```
 
-确认仓库是否仍保留旧版本，再按该软件的兼容要求降级。不要把强制降级作为通用命令。
+只下载、不安装：
 
-## 深入学习
+```bash
+sudo apt-get \
+  -o Dir::Cache::archives=/tmp/offline-debs \
+  --download-only install \
+  tmux rsync netcat-openbsd python3
+```
 
-- Ubuntu Server 软件包管理：https://ubuntu.com/server/docs/how-to/software/package-management/
-- Ubuntu Server 软件管理教程：https://ubuntu.com/server/docs/tutorial/managing-software/
-- Red Hat RHEL 9 DNF 软件管理：https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/managing_software_with_the_dnf_tool/
-- RPM 项目：https://rpm.org/documentation.html
-- Debian dpkg 手册：https://manpages.debian.org/dpkg
+生成校验：
 
-## 反馈与修改
+```bash
+cd /tmp/offline-debs
+sha256sum *.deb > SHA256SUMS
+```
 
-本文维护通用离线包流程。某个产品需要固定软件清单、指定仓库或完整离线介质时，应建立该产品自己的部署文档，并链接本文的系统匹配与校验规则。
+复制整个目录到内网后：
+
+```bash
+cd /path/to/offline-debs
+sha256sum -c SHA256SUMS
+sudo apt install ./*.deb
+```
+
+如果仍提示缺依赖，回到联网环境补齐，不要在隔离网里反复执行会联网的修复命令。
+
+> APT 会根据下载机当前已安装状态解析依赖。要做可复用离线包，最好使用与目标机同版本、同架构的干净 VM、chroot 或容器下载。
+
+## 4. Python 缺失或版本过低
+
+Ansible 大多数 Linux 模块需要目标机存在受支持的 Python。
+
+先检查：
+
+```bash
+python3 --version
+```
+
+```bash
+cat /etc/os-release
+uname -m
+```
+
+### 优先方案：从目标系统自己的仓库下载
+
+RPM 系先查看可用 Python：
+
+```bash
+dnf list --showduplicates 'python3*'
+```
+
+如果仓库提供需要的版本，例如 `python3.11`，联网机下载：
+
+```bash
+mkdir -p /tmp/python-rpms
+
+dnf download \
+  --resolve \
+  --alldeps \
+  --destdir /tmp/python-rpms \
+  python3.11
+```
+
+实际包名以当前发行版仓库为准。
+
+Debian / Ubuntu 同理，优先使用系统官方仓库提供的 Python 包：
+
+```bash
+apt-cache policy python3
+```
+
+下载：
+
+```bash
+sudo mkdir -p /tmp/python-debs/partial
+
+sudo apt-get \
+  -o Dir::Cache::archives=/tmp/python-debs \
+  --download-only install \
+  python3
+```
+
+### 不要覆盖系统 Python
+
+如果旧系统自带 Python 3.7，而 Ansible 需要更高版本，优先并行安装：
+
+```text
+/usr/bin/python3       # 系统原版本
+/usr/bin/python3.11    # 新装版本
+```
+
+然后在 Ansible Inventory 指定：
+
+```ini
+ansible_python_interpreter=/usr/bin/python3.11
+```
+
+不要随意修改 `/usr/bin/python3`、`alternatives` 或系统脚本依赖的默认 Python。
+
+### 官方仓库没有合适版本怎么办
+
+优先顺序：
+
+1. 目标发行版官方仓库或企业镜像；
+2. 该发行版官方支持的软件流/扩展仓库；
+3. 已在同版本测试机验证的兼容包；
+4. 最后才考虑从 Python 官方源码编译。
+
+Python 官方源码下载：
+
+- https://www.python.org/downloads/source/
+
+源码编译本身还需要 GCC、make、OpenSSL、zlib、libffi 等开发依赖，因此离线环境通常不如使用发行版软件包省事。
+
+## 5. Python pip 包离线下载
+
+如果要离线安装 Python 第三方库，在与目标机**相同 Python 大版本、相同架构、尽量相同系统环境**的联网机执行：
+
+```bash
+python3 -m pip download \
+  -d ./wheels \
+  -r requirements.txt
+```
+
+将 `wheels/` 和 `requirements.txt` 复制到内网后：
+
+```bash
+python3 -m pip install \
+  --no-index \
+  --find-links=./wheels \
+  -r requirements.txt
+```
+
+如果某个包只有源码分发而没有匹配的 wheel，离线主机仍可能需要编译环境；最好在联网侧提前确认下载结果。
+
+## 6. 软件包从哪里获取
+
+优先使用这些来源：
+
+- 当前 Linux 发行版的官方仓库或企业内部镜像；
+- 软件厂商自己的官方仓库；
+- Python 源码：https://www.python.org/downloads/source/
+- Python 第三方包：https://pypi.org/
+
+不建议从随机 RPM/DEB 下载站拼依赖。
+
+麒麟 V10 等国产 RPM 系统尤其要以目标机实际的 `/etc/os-release`、架构和已配置仓库为准，不要简单当作某个 CentOS/RHEL 版本直接混装。
+
+## 7. 多台主机怎么做
+
+只有少量主机时：
+
+```text
+联网机下载目录
+    ↓
+scp / U 盘 / 文件服务器
+    ↓
+内网 Linux 本地安装
+```
+
+如果几十、几百台主机长期需要离线安装，不要逐台复制包，应该建立内部 YUM/DNF/APT 软件仓库或镜像源，再由 Ansible 批量安装。
+
+批量运维参考：[Linux 批量运维速查](linux-batch-operations.md)。
+
+## 安装前最小检查
+
+```text
+□ 系统版本一致
+□ CPU 架构一致
+□ 软件包格式正确
+□ 依赖来自同一套兼容仓库
+□ SHA-256 校验通过
+□ 没有盲目替换 glibc / OpenSSL / Python / systemd 等系统关键组件
+```
+
+## 官方资料
+
+需要深入查参数时直接看官方文档：
+
+- Ubuntu 软件包管理：https://ubuntu.com/server/docs/how-to/software/package-management/
+- Red Hat DNF：https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/managing_software_with_the_dnf_tool/
+- RPM：https://rpm.org/documentation.html
+- Debian dpkg：https://manpages.debian.org/dpkg
+- Python 下载：https://www.python.org/downloads/
+- pip download：https://pip.pypa.io/en/stable/cli/pip_download/

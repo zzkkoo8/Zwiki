@@ -1,105 +1,71 @@
-# 快速修改与反馈入口
+# Zwiki 快速修改
 
-Zwiki 采用 **GitHub 唯一事实源**。
+Zwiki 以 **GitHub `main` 为唯一事实源**。阅读在 GitBook，修改最终回到 GitHub。
 
-GitBook 用于阅读、搜索和发布；正文修改最终必须进入 GitHub，再通过 Git Sync 发布。
+## 最快入口：Edit on GitHub
 
-## 修改入口选择
+Zwiki 当前已启用 GitBook 的 **Edit on GitHub/GitLab** Page Action。读者可以从页面操作菜单直接进入该页面对应的 GitHub 源文件，不需要每篇 Markdown 手工维护“编辑本文”链接。
 
-根据修改规模选择不同方式：
-
-| 类型 | 适合场景 | 推荐方式 |
-| --- | --- | --- |
-| 小修改 | 错别字、命令少字符、链接修正、描述优化 | GitHub Web Edit → PR → 自动审核 |
-| 中等修改 | 增加章节、优化流程、补充案例 | AI Agent 修改 GitHub Markdown → PR |
-| 大规模修改 | 目录调整、批量迁移、规范变化 | 先设计方案，再批量修改 |
-| 外部反馈 | 读者发现错误但不会修改 | GitHub Issue 文档纠错 |
-
-## 快速修改流程
+GitBook 设置路径：
 
 ```text
-GitBook 页面发现问题
-        ↓
-定位对应 GitHub Markdown
-        ↓
-GitHub Web Edit 或 AI 修改
-        ↓
-提交 PR
-        ↓
-AI 自动审核
-        ↓
+Docs site
+  → Customization
+  → Configure
+  → Page actions
+  → Edit on GitHub/GitLab
+```
+
+官方说明：
+
+- https://gitbook.com/docs/publishing-documentation/customization/extra-configuration
+
+## 小修改怎么做
+
+适合错别字、少量命令、链接或一句描述：
+
+```text
+GitBook 页面
+    ↓
+Edit on GitHub
+    ↓
+GitHub Web Edit
+    ↓
+提交修改 / PR
+    ↓
 合并 main
-        ↓
-GitBook Git Sync 发布
+    ↓
+GitBook Git Sync 自动更新
 ```
 
-## GitBook 页面如何定位源码
+## 中等修改怎么做
 
-不要根据 URL 猜文件路径。
-
-正确流程：
+增加章节、补案例、整理流程时：
 
 ```text
-GitBook URL
+让 AI / Codex 修改 GitHub Markdown
     ↓
-读取页面 metadata / git.path
+PR 自动审核
     ↓
-确认 GitHub Markdown 源文件
+合并 main
     ↓
-读取 SUMMARY.md 验证导航位置
-    ↓
-修改 GitHub 文件
+GitBook Git Sync
 ```
 
-## 三类反馈方式
+## 只想反馈错误
 
-### 页面体验反馈
-
-适合：
-
-- 内容是否有帮助；
-- 阅读体验问题；
-- 建议补充方向。
-
-使用 GitBook 页面反馈。
-
-### 文档错误反馈
-
-适合：
-
-- 命令错误；
-- 链接失效；
-- 描述过期；
-- 实际环境无法验证。
-
-提交 GitHub Issue，并填写：
+不会修改时直接提交 GitHub Issue，建议包含：
 
 ```text
 页面地址：
 问题描述：
-建议修改：
+正确内容或建议：
 验证环境：
 ```
 
-### 直接贡献修改
+## 原则
 
-如果知道正确修改方式：
-
-```text
-Fork / Branch
-    ↓
-修改 Markdown
-    ↓
-Pull Request
-    ↓
-AI Review
-    ↓
-Merge
-```
-
-## 禁止事项
-
-- 不直接修改 GitBook 正文作为最终结果；
-- 不复制同一篇文章到多个目录；
-- 不为了小修改创建复杂重构；
-- 不提交密码、Token、Cookie、私钥等敏感信息。
+- 不在 GitBook 和 GitHub 同时维护两份不同正文；
+- 不为了改几个字做大规模重构；
+- 不提交密码、Token、Cookie、私钥和未脱敏客户数据；
+- GitBook 的 Edit on Git 负责“快速入口”，GitHub 负责最终版本和审计历史。
