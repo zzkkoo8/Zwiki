@@ -1,249 +1,24 @@
-# Windows / Linux / macOS 批量运维 Linux 主机速查
+# Linux 批量运维速查
 
-用于从 Windows、Linux 或 macOS 批量向 Linux 主机执行命令、复制文件和运行运维任务。结论很简单：**临时、一次性操作优先用 OpenSSH；长期、重复、可审计的批量运维优先用 Ansible。**
+用于从 Windows、Linux 或 macOS 批量管理 Linux 主机。只记最常用方案：**临时执行用 SSH；重复、批量、需要分组和控制风险时用 Ansible。**
 
-## 文档信息
+## 直接选方案
 
-- **技术领域**：Linux 批量运维、OpenSSH、Ansible
-- **适用范围**：Windows 11、常见 Linux、macOS 作为运维端；Linux 作为被控端
-- **适用规模**：约 2～1000 台；本文示例为 10 台
-- **推荐方案**：SSH 做临时操作，Ansible 做标准化批量运维
-- **文档状态**：已验证方案
-- **最后验证**：2026-09-15
-- **来源**：Ansible 官方文档、Microsoft Learn
+| 场景 | 最简方案 |
+| --- | --- |
+| 临时操作 2～10 台 | SSH + PowerShell/Shell 循环 |
+| 经常管理多台 Linux | Ansible |
+| Windows 长期批量运维 | Windows SSH 到 Linux 控制机运行 Ansible；WSL 适合个人测试 |
+| Linux / macOS 长期运维 | 直接运行 Ansible |
+| 需要 Web UI、定时、审批 | 在 Ansible 上增加 Semaphore / AWX / Rundeck |
 
-## 1. 方案怎么选
+以下假设有 10 台 Linux：`192.168.1.101` ～ `192.168.1.110`。
 
-| 场景 | 推荐方案 | 说明 |
-| --- | --- | --- |
-| 临时检查 2～10 台 | OpenSSH + Shell / PowerShell 循环 | 无需额外平台，最快 |
-| 经常管理 10～1000 台 | Ansible | 无 Agent、Inventory 分组、支持幂等、并发和 Playbook |
-| Windows 临时批量执行 | PowerShell + OpenSSH | Windows 原生即可完成 |
-| Windows 长期使用 Ansible | 专用 Linux 控制机优先；WSL/容器适合开发、小规模使用 | Windows 原生不能直接作为 Ansible Control Node |
-| Linux / macOS 长期批量运维 | Ansible | 原生适合作为 Control Node |
-| 需要 Web UI、审批、定时任务 | Ansible + Semaphore / AWX / Rundeck | 在 Ansible 之上增加平台能力 |
-| 高频实时配置管理 | SaltStack / Puppet 等 | 体系更重，10 台主机通常没必要 |
+## 1. Ansible 最快用法
 
-Ansible 是 Agentless 工具，控制端通过 SSH 管理 Linux 主机；被控端通常不需要安装 Ansible，但常用模块需要 Python。
+### 1.1 Inventory 直接写账号密码
 
-> Windows 原生不能作为 Ansible Control Node。Ansible 官方允许在 Windows 下通过 WSL 或容器运行，但官方 Windows 指南明确说明 WSL 不作为生产控制端支持。正式生产批量运维更建议使用专用 Linux 控制机。
-
-## 2. 示例环境：10 台 Linux
-
-假设 10 台 Linux 主机地址如下：
-
-```text
-192.168.1.101
-192.168.1.102
-192.168.1.103
-192.168.1.104
-192.168.1.105
-192.168.1.106
-192.168.1.107
-192.168.1.108
-192.168.1.109
-192.168.1.110
-```
-
-登录用户：
-
-```text
-ops
-```
-
-先保存成 `hosts.txt`：
-
-```text
-192.168.1.101
-192.168.1.102
-192.168.1.103
-192.168.1.104
-192.168.1.105
-192.168.1.106
-192.168.1.107
-192.168.1.108
-192.168.1.109
-192.168.1.110
-```
-
-推荐提前完成 SSH Key 登录。不要把密码直接写入脚本、Inventory 或 Git 仓库。
-
-单台验证：
-
-```bash
-ssh ops@192.168.1.101
-```
-
-## 3. Windows：PowerShell + OpenSSH
-
-### 3.1 检查 OpenSSH
-
-PowerShell：
-
-```powershell
-Get-Command ssh
-ssh -V
-```
-
-如果未安装 OpenSSH Client，以管理员 PowerShell 执行：
-
-```powershell
-Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0
-```
-
-### 3.2 顺序向 10 台主机执行命令
-
-适用于 Windows PowerShell 5.1 和 PowerShell 7：
-
-```powershell
-Get-Content .\hosts.txt | ForEach-Object {
-    ssh "ops@$_" "hostname; uptime; df -h /"
-}
-```
-
-优点是简单；缺点是逐台执行，某台 SSH 卡住会拖慢整体。
-
-### 3.3 PowerShell 7 并行执行
-
-确认版本：
-
-```powershell
-$PSVersionTable.PSVersion
-```
-
-PowerShell 7 可使用 `ForEach-Object -Parallel`：
-
-```powershell
-Get-Content .\hosts.txt | ForEach-Object -Parallel {
-    ssh "ops@$_" "hostname; uptime; df -h /"
-} -ThrottleLimit 5
-```
-
-`ThrottleLimit 5` 表示最多同时处理 5 台，10 台主机会分批执行。
-
-### 3.4 批量复制文件
-
-```powershell
-Get-Content .\hosts.txt | ForEach-Object {
-    $hostName = $_
-    scp .\check.sh "ops@${hostName}:/tmp/check.sh"
-}
-```
-
-再批量执行：
-
-```powershell
-Get-Content .\hosts.txt | ForEach-Object -Parallel {
-    ssh "ops@$_" "chmod +x /tmp/check.sh && /tmp/check.sh"
-} -ThrottleLimit 5
-```
-
-### 3.5 Windows 什么时候改用 Ansible
-
-出现以下任一情况就不要继续堆 PowerShell SSH 循环：
-
-- 命令需要反复执行；
-- 需要按测试、生产、应用类型分组；
-- 需要安装软件、修改配置、管理服务；
-- 需要限制每批变更主机数量；
-- 需要重复执行时保持结果一致；
-- 需要把运维任务放进 Git 管理。
-
-这时应切换到 Ansible。Windows 工作站可以连接一台专用 Linux 运维机执行 Ansible；个人开发或实验环境也可以使用 WSL。
-
-## 4. Linux：Shell SSH 与 Ansible
-
-### 4.1 不装额外工具：SSH 循环
-
-```bash
-while IFS= read -r host; do
-  ssh "ops@$host" 'hostname; uptime; df -h /'
-done < hosts.txt
-```
-
-### 4.2 使用 xargs 并发
-
-常见 Linux 可直接使用：
-
-```bash
-xargs -P 5 -I {} ssh "ops@{}" 'hostname; uptime; df -h /' < hosts.txt
-```
-
-参数：
-
-- `-P 5`：最多并发 5 个 SSH；
-- `-I {}`：用每行主机地址替换 `{}`。
-
-临时检查够用；正式批量变更仍建议 Ansible。
-
-## 5. macOS：SSH 与 Ansible
-
-macOS 自带 OpenSSH，因此临时批量命令与 Linux 基本相同。
-
-顺序执行：
-
-```bash
-while IFS= read -r host; do
-  ssh "ops@$host" 'hostname; uptime; df -h /'
-done < hosts.txt
-```
-
-并发执行：
-
-```bash
-xargs -P 5 -I {} ssh "ops@{}" 'hostname; uptime; df -h /' < hosts.txt
-```
-
-如果经常维护 Linux 主机，直接安装 Ansible：
-
-```bash
-brew install ansible
-```
-
-检查：
-
-```bash
-ansible --version
-```
-
-macOS 和 Linux 都是适合直接运行 Ansible 的 Control Node。
-
-## 6. Ansible：三端统一的长期方案
-
-Windows 如果需要使用这一套，建议把以下目录和命令放在 Linux 控制机；个人环境可以放在 WSL 中。Linux / macOS 可直接执行。
-
-推荐目录：
-
-```text
-linux-ops/
-├── inventory.ini
-├── ansible.cfg
-├── playbooks/
-│   └── check.yml
-└── files/
-```
-
-### 6.1 安装 Ansible
-
-官方推荐的通用 Python 隔离安装方式之一是 `pipx`：
-
-```bash
-pipx install --include-deps ansible
-```
-
-也可以使用系统包管理器安装。macOS 最直接：
-
-```bash
-brew install ansible
-```
-
-安装后统一检查：
-
-```bash
-ansible --version
-```
-
-### 6.2 创建 10 台主机 Inventory
+临时环境、测试环境需要最快跑起来时，可以直接写密码。
 
 `inventory.ini`：
 
@@ -261,92 +36,167 @@ node09 ansible_host=192.168.1.109
 node10 ansible_host=192.168.1.110
 
 [linux:vars]
-ansible_user=ops
+ansible_user=root
+ansible_password=CHANGE_ME
 ```
 
-如果 SSH 默认会自动找到正确私钥，不需要把私钥路径写进 Inventory。
+如果使用普通用户 + sudo：
 
-验证 Inventory：
+```ini
+[linux:vars]
+ansible_user=ops
+ansible_password=CHANGE_ME
+ansible_become=true
+ansible_become_method=sudo
+ansible_become_password=CHANGE_ME
+```
+
+这是**最简单但不安全**的方式，只适合本地临时文件：
 
 ```bash
-ansible-inventory -i inventory.ini --graph
+chmod 600 inventory.ini
 ```
 
-测试连通：
+不要把含密码的 Inventory 提交到 Git。长期使用改成 SSH Key 或 `ansible-vault`。
+
+### 1.2 先验证 SSH，不依赖 Python
+
+`raw` 模块可以在目标 Linux 没有 Python 时工作：
+
+```bash
+ansible linux -i inventory.ini -m ansible.builtin.raw -a 'hostname; command -v python3 || true; python3 --version 2>/dev/null || true'
+```
+
+只要 SSH、账号和密码正常，就能看到每台主机结果。
+
+### 1.3 Python 正常后测试 Ansible
 
 ```bash
 ansible linux -i inventory.ini -m ansible.builtin.ping
 ```
 
-### 6.3 批量执行一条命令
+全部返回 `SUCCESS` 后再执行批量任务。
 
-查看 uptime：
+## 2. 目标机没有 Python
+
+Ansible 大多数 Linux 模块需要目标机存在受支持的 Python；`raw` 是常用引导手段。
+
+### RPM 系：RHEL / Rocky / CentOS / 部分麒麟
+
+```bash
+ansible linux -i inventory.ini -m ansible.builtin.raw -a 'dnf install -y python3' -b
+```
+
+旧系统只有 YUM：
+
+```bash
+ansible linux -i inventory.ini -m ansible.builtin.raw -a 'yum install -y python3' -b
+```
+
+### Debian / Ubuntu
+
+```bash
+ansible linux -i inventory.ini -m ansible.builtin.raw -a 'apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y python3' -b
+```
+
+安装后：
+
+```bash
+ansible linux -i inventory.ini -m ansible.builtin.ping
+```
+
+## 3. Python 版本太低
+
+先查看控制端 Ansible 和远端 Python：
+
+```bash
+ansible --version
+```
+
+```bash
+ansible linux -i inventory.ini -m ansible.builtin.raw -a 'python3 --version 2>/dev/null || python --version 2>/dev/null || true'
+```
+
+截至 2026-09，`ansible-core 2.21` 的目标 Linux Python 支持范围是 **3.9～3.14**。不同 Ansible 版本要求不同，升级前查看官方支持矩阵：
+
+- https://docs.ansible.com/projects/ansible/latest/reference_appendices/release_and_maintenance.html
+
+如果系统自带 Python 太老，例如 Python 3.7，**不要直接替换系统 Python**。优先并行安装一个新版本，例如：
+
+```text
+/usr/bin/python3       # 系统原 Python，保持不动
+/usr/bin/python3.11    # 新装给 Ansible 使用
+```
+
+然后在 Inventory 指定：
+
+```ini
+[linux:vars]
+ansible_python_interpreter=/usr/bin/python3.11
+```
+
+测试：
+
+```bash
+ansible linux -i inventory.ini -m ansible.builtin.ping
+```
+
+内网主机无法在线安装时，按 [Linux 离线软件安装速查](linux-offline-package-management.md) 在同版本、同架构联网环境下载 Python 和依赖，再复制进内网安装。
+
+## 4. 常用批量命令
+
+查看运行时间：
 
 ```bash
 ansible linux -i inventory.ini -m ansible.builtin.command -a 'uptime'
 ```
 
-限制最大并发为 5：
+查看系统、磁盘和内存：
+
+```bash
+ansible linux -i inventory.ini -m ansible.builtin.shell -a 'cat /etc/os-release; df -hT; free -h'
+```
+
+控制并发为 5：
 
 ```bash
 ansible linux -i inventory.ini -m ansible.builtin.command -a 'uptime' -f 5
 ```
 
-`command` 不经过 Shell，能用它时优先使用它。
-
-### 6.4 执行需要 Shell 的组合命令
+只操作一台：
 
 ```bash
-ansible linux -i inventory.ini -m ansible.builtin.shell -a 'hostname; uptime; df -hT; free -h'
+ansible node01 -i inventory.ini -m ansible.builtin.command -a 'uptime'
 ```
 
-只有管道、重定向、Shell 内建功能等确实需要 Shell 时再使用 `shell`。
-
-### 6.5 批量复制文件
+复制文件：
 
 ```bash
 ansible linux -i inventory.ini \
   -m ansible.builtin.copy \
-  -a 'src=files/check.sh dest=/tmp/check.sh mode=0755'
+  -a 'src=./check.sh dest=/tmp/check.sh mode=0755'
 ```
 
-### 6.6 批量执行本地脚本
-
-无需先手动复制：
+直接下发并执行本地脚本：
 
 ```bash
 ansible linux -i inventory.ini \
   -m ansible.builtin.script \
-  -a './files/check.sh'
+  -a './check.sh'
 ```
 
-### 6.7 批量安装软件
-
-使用 `package` 模块可以屏蔽常见包管理器差异：
+安装软件：
 
 ```bash
 ansible linux -i inventory.ini \
   -b \
   -m ansible.builtin.package \
-  -a 'name=vim state=present'
+  -a 'name=tmux state=present'
 ```
 
-需要 sudo 密码时：
+## 5. 有变更的任务：先 1 台，再分批
 
-```bash
-ansible linux -i inventory.ini \
-  -b -K \
-  -m ansible.builtin.package \
-  -a 'name=vim state=present'
-```
-
-不要把 sudo 密码直接放在命令行。
-
-## 7. 重复任务用 Playbook
-
-一次性命令适合 ad-hoc；重复任务应写成 Playbook。
-
-`playbooks/check.yml`：
+`check.yml`：
 
 ```yaml
 ---
@@ -359,166 +209,110 @@ ansible linux -i inventory.ini \
     - name: Check uptime
       ansible.builtin.command: uptime
       changed_when: false
-
-    - name: Check root filesystem
-      ansible.builtin.command: df -h /
-      changed_when: false
 ```
 
-执行：
+先测试 1 台：
 
 ```bash
-ansible-playbook -i inventory.ini playbooks/check.yml
+ansible-playbook -i inventory.ini check.yml --limit node01
 ```
 
-这里：
-
-```yaml
-serial: 2
-```
-
-表示 10 台主机每批只处理 2 台。软件升级、服务重启和配置变更时非常重要。
-
-### 7.1 先测试 1 台
-
-正式批量执行前：
+确认后执行全部：
 
 ```bash
-ansible-playbook \
-  -i inventory.ini \
-  playbooks/check.yml \
-  --limit node01
+ansible-playbook -i inventory.ini check.yml
 ```
 
-确认 node01 正常后再跑全部。
+`serial: 2` 表示每批只处理 2 台。升级、重启、配置修改等任务建议固定使用这种方式。
 
-### 7.2 Check Mode
+## 6. Windows 最简批量命令
 
-支持 Check Mode 的模块可以先预演：
+Windows 11 自带 OpenSSH Client 的情况下，PowerShell 可以直接循环：
 
-```bash
-ansible-playbook \
-  -i inventory.ini \
-  playbooks/check.yml \
-  --check --diff
+```powershell
+$hosts = '192.168.1.101'..'192.168.1.110'
 ```
 
-注意：并非所有模块、命令或第三方脚本都能准确模拟变更。
-
-### 7.3 调整并发
-
-Ansible 默认使用有限数量的 forks，可以通过 `-f` 调整：
-
-```bash
-ansible-playbook \
-  -i inventory.ini \
-  playbooks/check.yml \
-  -f 5
-```
-
-两者区别：
-
-- `forks / -f`：控制同时工作的进程数量；
-- `serial`：控制一个 Play 每批实际处理多少台主机。
-
-有变更风险的任务优先使用 `serial` 控制批次，而不是单纯把并发调大。
-
-## 8. 推荐的实际操作流程
-
-10 台主机建议固定成下面的流程：
+IP 最后一段不适合直接用字符串范围生成，实际使用建议保存 `hosts.txt`：
 
 ```text
-1. SSH 单台验证
-        ↓
-2. ansible ping 全量确认连通
-        ↓
-3. --limit node01 先执行 1 台
-        ↓
-4. 检查结果
-        ↓
-5. serial: 2 或 serial: 3 分批执行
-        ↓
-6. 全量验证
+192.168.1.101
+192.168.1.102
+192.168.1.103
+...
+192.168.1.110
 ```
 
-常用命令：
+顺序执行：
+
+```powershell
+Get-Content .\hosts.txt | ForEach-Object {
+    ssh "root@$_" "hostname; uptime"
+}
+```
+
+PowerShell 7 并发执行：
+
+```powershell
+Get-Content .\hosts.txt | ForEach-Object -Parallel {
+    ssh "root@$_" "hostname; uptime"
+} -ThrottleLimit 5
+```
+
+如果任务开始涉及安装软件、修改配置、分组、失败重试，不要继续堆 PowerShell 脚本，切换到 Ansible。
+
+> Windows 原生不是 Ansible Control Node。生产环境更建议使用专用 Linux 控制机；WSL 可用于个人测试和临时使用。
+
+## 7. Linux / macOS 临时不用 Ansible
+
+`hosts.txt` 每行一个 IP：
 
 ```bash
-ansible linux -i inventory.ini -m ansible.builtin.ping
+while IFS= read -r host; do
+  ssh "root@$host" 'hostname; uptime'
+done < hosts.txt
 ```
+
+并发 5 台：
 
 ```bash
-ansible linux -i inventory.ini -m ansible.builtin.command -a 'uptime' -f 5
+xargs -P 5 -I {} ssh root@{} 'hostname; uptime' < hosts.txt
 ```
 
-```bash
-ansible-playbook -i inventory.ini playbooks/check.yml --limit node01
-```
+这适合一次性检查；重复任务仍用 Ansible。
 
-```bash
-ansible-playbook -i inventory.ini playbooks/check.yml
-```
+## 8. 其他工具什么时候用
 
-## 9. 安全注意事项
+| 工具 | 适用场景 |
+| --- | --- |
+| `pssh` / `parallel-ssh` / `pdsh` | 只需要并发 SSH 命令，比 Ansible 更轻 |
+| Semaphore | 想给 Ansible 加简单 Web UI、计划任务和执行记录 |
+| AWX | 团队化 Ansible 管理，权限、凭据、作业模板要求较高 |
+| Rundeck | 更偏 Runbook、跨步骤作业编排 |
+| SaltStack / Puppet | 大规模持续配置管理；少量主机通常没必要 |
 
-- 优先使用 SSH Key，不把密码写进脚本和 Git。
-- 第一次连接主机时核对 SSH Host Key 指纹，不要为了省事长期关闭 Host Key Checking。
-- Inventory 中不要保存明文密码。
-- 必须保存敏感变量时使用 `ansible-vault` 或外部 Secret Manager。
-- 删除文件、重启服务、升级系统、修改网络和防火墙前先使用 `--limit` 小范围验证。
-- 生产变更建议使用 `serial` 分批执行。
-- 优先使用 `command`、`copy`、`package`、`service`、`template` 等 Ansible 模块，不要把所有任务都写成 `shell`。
-- 关键任务纳入 Git，保留 Inventory、Playbook 和变更历史。
-
-## 10. 其它方案
-
-### parallel-ssh / pssh / pdsh
-
-适合“同时对很多机器执行相同命令”，比手写 SSH 循环方便，但不擅长复杂状态管理、幂等和长期维护。
-
-定位：
+## 推荐操作顺序
 
 ```text
-SSH 循环 < parallel-ssh / pdsh < Ansible
+SSH / raw 验证连接
+        ↓
+确认或补齐 Python
+        ↓
+ansible ping
+        ↓
+--limit 先跑 1 台
+        ↓
+serial 分批执行
+        ↓
+全量验证
 ```
 
-### SaltStack
+## 官方资料
 
-适合更大规模、长期在线、需要快速远程执行和配置管理的环境。通常需要 Master/Minion 或其它常驻组件，部署复杂度明显高于 Ansible。
+只在需要确认版本或深入参数时查看：
 
-### Puppet
-
-更偏持续配置管理和合规状态维护，不适合替代日常临时批量命令工具。
-
-### Semaphore / AWX
-
-它们不是 Ansible 的替代品，而是给 Ansible 增加 Web UI、任务模板、权限、调度、日志等能力。个人或 10 台主机场景先不用上平台。
-
-## 11. 最终推荐
-
-如果只记住三句话：
-
-1. **Windows 临时批量运维：PowerShell + OpenSSH。**
-2. **Linux / macOS 临时批量运维：OpenSSH；长期统一用 Ansible。**
-3. **正式生产环境：把 Ansible 放在专用 Linux 运维控制机，Windows/macOS 只作为入口。**
-
-这样可以从 10 台平滑扩展到几十、几百甚至更多主机，同时避免以后重新维护多套 Windows、Linux、macOS 脚本。
-
-## 相关文档
-
-- [Linux 运维开局常用命令](linux-ops-bootstrap.md)
-- [Linux 在线/离线软件包管理速查](linux-offline-package-management.md)
-- [Ansible：Installing Ansible](https://docs.ansible.com/projects/ansible-core/devel/installation_guide/intro_installation.html)
-- [Ansible：Building an inventory](https://docs.ansible.com/projects/ansible/latest/getting_started/get_started_inventory.html)
-- [Ansible：Introduction to ad hoc commands](https://docs.ansible.com/projects/ansible/latest/command_guide/intro_adhoc.html)
-- [Ansible：Controlling playbook execution](https://docs.ansible.com/projects/ansible/latest/playbook_guide/playbooks_strategies.html)
-- [Microsoft：Windows OpenSSH](https://learn.microsoft.com/windows-server/administration/openssh/openssh_install_firstuse)
-- [Microsoft：PowerShell 并行执行](https://learn.microsoft.com/powershell/scripting/dev-cross-plat/performance/parallel-execution)
-
-## 反馈与修改
-
-发现本文错误或需要补充时：
-
-- 内容错误、命令错误、失效链接：通过 Zwiki 的“文档纠错”入口提交 Issue。
-- 已确认修改方案：直接修改 GitHub Markdown 并提交 Pull Request。
-- 小范围修正优先保持原路径，不重复创建新文章。
+- Ansible 安装与节点要求：https://docs.ansible.com/projects/ansible/latest/installation_guide/intro_installation.html
+- Ansible `raw` 模块：https://docs.ansible.com/projects/ansible/latest/collections/ansible/builtin/raw_module.html
+- Ansible Python 支持矩阵：https://docs.ansible.com/projects/ansible/latest/reference_appendices/release_and_maintenance.html
+- Ansible Inventory：https://docs.ansible.com/projects/ansible/latest/inventory_guide/intro_inventory.html
+- Windows OpenSSH：https://learn.microsoft.com/windows-server/administration/openssh/openssh-overview
