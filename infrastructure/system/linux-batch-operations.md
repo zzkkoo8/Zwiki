@@ -1,10 +1,18 @@
 # Linux 批量运维速查
 
-用于从一台控制机批量管理 Linux 主机。推荐默认流程：**现有密码只用于一次性引导，自动创建临时运维账号和临时 SSH Key；批量任务结束后立即回收账号、sudo 权限和密钥。**
+用于从一台控制机批量管理 Linux 主机。**不需要先逐台手工写 SSH 公钥。**
 
-这样不需要逐台手工执行 `ssh-copy-id`，也不会长期保留批量运维权限。
+## 直接选方案
 
-## 推荐流程
+| 场景 | 最简方案 |
+| --- | --- |
+| 只执行一次短任务 | Ansible 直接用现有账号密码，任务结束删除临时 Inventory |
+| 不想让后续任务继续使用 root/管理员密码 | 密码只做一次 bootstrap，自动创建临时账号 + 临时 SSH Key |
+| 多人、自动化、持续一段时间批量操作 | 临时账号 + 临时 Key + 临时 sudo，结束后统一 cleanup |
+
+如果只是自己临时执行几条命令，**直接密码认证最简单，不需要创建 Key，也不需要修改服务器权限。**
+
+如果需要把 root/管理员密码与后续批量任务隔离，推荐下面的完整临时授权流程：
 
 ```text
 已有 root / 管理员密码
@@ -28,9 +36,9 @@ cleanup：删除 sudoers、账号、公钥、控制端私钥
 
 以下假设管理 10 台 Linux：`192.168.1.101` ～ `192.168.1.110`。
 
-## 1. 准备首次登录 Inventory
+## 1. 最短方案：直接密码批量运维
 
-### 1.1 10 台主机密码相同
+### 1.1 10 台密码相同
 
 `inventory-bootstrap.ini`：
 
@@ -54,8 +62,6 @@ ansible_password=CHANGE_ME
 
 ### 1.2 每台密码不同
 
-直接写到对应主机行即可：
-
 ```ini
 [linux]
 node01 ansible_host=192.168.1.101 ansible_user=root ansible_password=CHANGE_ME_01
@@ -65,7 +71,7 @@ node03 ansible_host=192.168.1.103 ansible_user=root ansible_password=CHANGE_ME_0
 
 其余主机按同样格式继续写。
 
-如果现有账号不是 root，而是普通管理员账号 + sudo：
+如果是普通管理员账号 + sudo：
 
 ```ini
 [linux:vars]
@@ -82,9 +88,9 @@ ansible_become_password=CHANGE_ME
 chmod 600 inventory-bootstrap.ini
 ```
 
-**不要提交到 Git。** 如果需要保存较长时间，改用 `ansible-vault`。
+不要提交到 Git。需要长期保存时改用 `ansible-vault`。
 
-先确认密码通道可用；`raw` 不依赖目标机 Python：
+目标机没有 Python 也能先用 `raw`：
 
 ```bash
 ansible linux -i inventory-bootstrap.ini \
@@ -92,9 +98,29 @@ ansible linux -i inventory-bootstrap.ini \
   -a 'hostname; id; command -v python3 || true'
 ```
 
-## 2. 控制机生成一次性 SSH Key
+如果只是一次短任务，直接执行即可：
 
-在 Linux / macOS 控制机执行：
+```bash
+ansible linux -i inventory-bootstrap.ini \
+  -m ansible.builtin.shell \
+  -a 'hostname; uptime; df -hT; free -h'
+```
+
+执行完成后删除临时密码文件：
+
+```bash
+rm -f inventory-bootstrap.ini
+```
+
+这种方式**不会在目标服务器留下额外账号或 SSH Key**。
+
+## 2. 推荐方案：自动创建临时运维账号和 Key
+
+适合不希望后续批量任务继续携带 root/管理员密码的场景。
+
+### 2.1 控制机生成一次性 SSH Key
+
+Linux / macOS 控制机执行：
 
 ```bash
 umask 077
@@ -115,7 +141,7 @@ ssh-keygen -q \
 
 这把 Key 只用于本次批量运维，不复用为长期管理密钥。
 
-## 3. 一次性 Bootstrap：自动创建临时运维权限
+### 2.2 一次性 Bootstrap
 
 创建 `bootstrap.yml`：
 
@@ -151,10 +177,19 @@ ssh-keygen -q \
         chown "$user:$user" "$home/.ssh/authorized_keys"
         chmod 600 "$home/.ssh/authorized_keys"
 
-        command -v visudo >/dev/null 2>&1 || {
-          echo 'visudo not found; cannot grant temporary sudo safely'
-          exit 1
-        }
+        if ! command -v visudo >/dev/null 2>&1; then
+          if command -v dnf >/dev/null 2>&1; then
+            dnf install -y sudo
+          elif command -v yum >/dev/null 2>&1; then
+            yum install -y sudo
+          elif command -v apt-get >/dev/null 2>&1; then
+            apt-get update
+            DEBIAN_FRONTEND=noninteractive apt-get install -y sudo
+          else
+            echo 'sudo/visudo missing and no supported package manager found'
+            exit 1
+          fi
+        fi
 
         mkdir -p /etc/sudoers.d
         tmp="$(mktemp)"
@@ -181,9 +216,9 @@ ssh-keygen -q \
         fi
 ```
 
-这里的 `NOPASSWD: ALL` 是为了让通用批量运维不再需要第二套 sudo 密码，**只适用于这个临时账号**。如果本次任务只做只读检查，不需要 root 权限，可以删除 sudoers 相关部分。
+这里的 `NOPASSWD: ALL` 只给临时账号使用，目的是让通用批量运维不再依赖第二套 sudo 密码。**如果本次只做只读检查，删掉 sudoers 相关部分即可。**
 
-### 3.1 先只开一台
+### 2.3 先只开一台
 
 ```bash
 ansible-playbook \
@@ -192,13 +227,11 @@ ansible-playbook \
   --limit node01
 ```
 
-如果使用普通管理员账号，Inventory 中的 `ansible_become=true` 会负责提权。
+确认原有管理员通道仍正常，再继续。
 
-## 4. 验证临时账号后再全量开启
+## 3. 用临时 Key 批量运维
 
-创建日常运维 Inventory：
-
-`inventory-ops.ini`：
+创建 `inventory-ops.ini`：
 
 ```ini
 [linux]
@@ -227,19 +260,23 @@ ansible node01 -i inventory-ops.ini \
   -a 'id; sudo -n id; chage -l ops-maint | grep "Account expires"'
 ```
 
-确认临时账号、sudo 和过期时间都正常后，再对 10 台执行 bootstrap：
+确认临时账号、sudo 和过期时间正常后，对全部主机执行 bootstrap：
 
 ```bash
 ansible-playbook -i inventory-bootstrap.ini bootstrap.yml
 ```
 
-然后验证全部：
+然后测试：
 
 ```bash
 ansible linux -i inventory-ops.ini -m ansible.builtin.ping
 ```
 
-如果 Python 版本过低导致 `ping` 失败，先用 `raw` 检查：
+### Python 缺失或版本过低
+
+Bootstrap 会在常见 RPM / DEB 系统中尝试补装 `python3`。
+
+如果系统 Python 太旧导致 `ansible ping` 失败，先检查：
 
 ```bash
 ansible linux -i inventory-ops.ini \
@@ -247,7 +284,7 @@ ansible linux -i inventory-ops.ini \
   -a 'python3 --version 2>/dev/null || true'
 ```
 
-不要直接替换系统 Python。优先并行安装新版本，例如 `/usr/bin/python3.11`，再指定：
+不要直接覆盖系统 Python。优先并行安装新版本，例如 `/usr/bin/python3.11`，再指定：
 
 ```ini
 [linux:vars]
@@ -256,9 +293,9 @@ ansible_python_interpreter=/usr/bin/python3.11
 
 内网主机没有可用 Python 包时，按 [Linux 离线软件安装速查](linux-offline-package-management.md) 下载对应发行版、版本和架构的软件包及依赖。
 
-## 5. 批量运维
+## 4. 常用批量命令
 
-查看状态：
+系统状态：
 
 ```bash
 ansible linux -i inventory-ops.ini \
@@ -266,7 +303,7 @@ ansible linux -i inventory-ops.ini \
   -a 'hostname; uptime; df -hT; free -h'
 ```
 
-控制并发为 5：
+并发 5 台：
 
 ```bash
 ansible linux -i inventory-ops.ini \
@@ -300,7 +337,7 @@ ansible linux -i inventory-ops.ini \
   -a 'name=tmux state=present'
 ```
 
-有变更的任务固定遵循：
+有变更的任务固定使用：
 
 ```text
 --limit 先跑 1 台
@@ -331,9 +368,9 @@ ansible-playbook -i inventory-ops.ini change.yml --limit node01
 ansible-playbook -i inventory-ops.ini change.yml
 ```
 
-## 6. 用完立即关闭临时运维权限
+## 5. 用完立即关闭临时权限
 
-**Cleanup 使用最初的 `inventory-bootstrap.ini`，不要用正在被删除的临时账号自己删自己。**
+Cleanup 使用最初的 `inventory-bootstrap.ini`，不要让 `ops-maint` 自己删除自己。
 
 创建 `cleanup.yml`：
 
@@ -362,7 +399,7 @@ ansible-playbook -i inventory-ops.ini change.yml
         fi
 ```
 
-先回收一台并验证：
+先回收一台：
 
 ```bash
 ansible-playbook \
@@ -370,6 +407,8 @@ ansible-playbook \
   cleanup.yml \
   --limit node01
 ```
+
+验证：
 
 ```bash
 ansible node01 -i inventory-bootstrap.ini \
@@ -383,16 +422,16 @@ ansible node01 -i inventory-bootstrap.ini \
 ansible-playbook -i inventory-bootstrap.ini cleanup.yml
 ```
 
-最后删除控制端临时私钥、公钥；如果 bootstrap Inventory 含明文密码，也一起删除：
+最后删除控制端临时 Key；如果 bootstrap Inventory 含明文密码，也一起删除：
 
 ```bash
 rm -f .keys/ops-maint .keys/ops-maint.pub
 rm -f inventory-bootstrap.ini
 ```
 
-> 如果 cleanup 中 `userdel` 因残留进程失败，Playbook 已先删除 sudoers、公钥并把账号锁定为 `nologin`；此时批量登录权限已经被回收，再单独清理残留账号即可。
+如果 `userdel` 因残留进程失败，脚本已经先删除 sudoers、公钥并将账号改为 `nologin`；此时远程批量登录权限已被回收，再单独清理残留账号即可。
 
-## 7. 为什么要设置“次日自动过期”
+## 6. 次日自动过期只是兜底
 
 正常情况必须主动执行 cleanup。账号过期只是防止忘记回收的第二道保险：
 
@@ -402,9 +441,9 @@ rm -f inventory-bootstrap.ini
 删除控制端临时私钥     防止本机继续复用
 ```
 
-不要创建永久 `ops-maint`，也不要长期保留同一把批量运维私钥。
+不要创建永久 `ops-maint`，也不要长期复用同一把批量运维私钥。
 
-## 8. Windows / macOS 怎么用
+## 7. Windows / macOS
 
 Linux / macOS 可以直接作为 Ansible 控制端。
 
@@ -418,27 +457,26 @@ Windows
 多台 Linux
 ```
 
-Windows 临时只执行几条命令时可以使用 PowerShell + OpenSSH；一旦涉及账号、sudo、文件下发、失败重试和权限回收，统一使用上面的 Ansible 流程。
+Windows 临时执行几条命令可使用 PowerShell + OpenSSH；一旦涉及账号、sudo、文件下发、失败重试和权限回收，统一使用上面的 Ansible 流程。
 
-## 9. 最终推荐
-
-对于 10 台、几十台甚至更多 Linux，推荐把批量运维入口固定成：
+## 最终推荐
 
 ```text
-bootstrap 密码凭据
-        ↓
-一次性临时 Key + 临时账号
-        ↓
-Ansible 批量运维
-        ↓
-cleanup 强制回收
+一次短任务
+  → 直接密码 Inventory
+  → 批量执行
+  → 删除 Inventory
+
+需要隔离管理员密码
+  → 密码只做 bootstrap
+  → 临时账号 + 临时 Key
+  → Ansible 批量运维
+  → cleanup 强制回收
 ```
 
-这比“逐台手工写公钥”效率更高，也比“永久 root Key / 永久 sudo 账号”更容易控制风险。
+这样既省掉逐台手工写公钥，也避免永久 root Key 或永久 sudo 账号。
 
 ## 官方资料
-
-只在需要确认版本或深入参数时查看：
 
 - Ansible `raw`：https://docs.ansible.com/projects/ansible/latest/collections/ansible/builtin/raw_module.html
 - Ansible SSH Connection：https://docs.ansible.com/projects/ansible/latest/collections/ansible/builtin/ssh_connection.html
