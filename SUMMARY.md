@@ -17,6 +17,7 @@
   * [网络](infrastructure/network/README.md)
     * [网络故障快速排查](infrastructure/network/network-troubleshooting.md)
     * [tcpdump 抓包与快速判断](infrastructure/network/tcpdump-packet-analysis.md)
+    * [双网卡 + VPN 指定流量分流（Windows / macOS）](infrastructure/network/vpn-split-routing-windows-macos.md)
   * [基础服务](infrastructure/services/README.md)
     * [Nginx 日常运维速查](infrastructure/services/nginx-operations.md)
     * [Nginx 故障排查速查](infrastructure/services/nginx-troubleshooting.md)

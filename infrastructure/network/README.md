@@ -6,6 +6,7 @@
 
 - [网络故障快速排查](network-troubleshooting.md)：从网卡/IP、路由、ARP、DNS、端口、服务监听到防火墙/抓包逐层定位。
 - [tcpdump 抓包与快速判断](tcpdump-packet-analysis.md)：常用过滤、SYN/RST、双端抓包和重传判断。
+- [双网卡 + VPN 指定流量分流（Windows / macOS）](vpn-split-routing-windows-macos.md)：默认流量走有线，仅把 VPN 公网端点固定到手机网络，并验证 VPN 内网路由。
 
 ## 收录范围
 
