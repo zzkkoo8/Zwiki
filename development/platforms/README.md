@@ -4,12 +4,12 @@
 
 ## 当前内容
 
-- [GitHub 发布](github-publishing.md)
+* [GitHub 发布](github-publishing.md)
 
 ## 边界
 
 这里回答“项目通过什么平台完成托管、协作、构建和发布”。
 
-- 前端、后端、测试和设计工具放在[技术栈与工具](../tooling/README.md)。
-- Vibe Coding、Coding Agent 和 AI 开发方法放在 [AI Coding](../../ai/coding/README.md)。
-- Skills、插件和 MCP 放在 [Skills 与插件](../../ai/skills-plugins.md)。
+* 前端、后端、测试和设计工具放在[技术栈与工具](../tooling.md)。
+* Vibe Coding、Coding Agent 和 AI 开发方法放在 [AI Coding](../../ai/coding/)。
+* Skills、插件和 MCP 放在 [Skills 与插件](../../ai/skills-plugins.md)。

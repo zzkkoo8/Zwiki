@@ -1,7 +1,6 @@
 # Table of contents
 
 * [知识库首页](README.md)
-
 * [基建](infrastructure/README.md)
   * [硬件](infrastructure/hardware/README.md)
     * [服务器双分区启动 U 盘](infrastructure/hardware/bootable-usb-fat32-exfat.md)
@@ -22,7 +21,6 @@
   * [基础服务](infrastructure/services/README.md)
     * [Nginx 日常运维速查](infrastructure/services/nginx-operations.md)
     * [Nginx 故障排查速查](infrastructure/services/nginx-troubleshooting.md)
-
 * [容器与云原生](cloud-native/README.md)
   * [Docker](cloud-native/docker/README.md)
     * [Docker 日常运维速查](cloud-native/docker/docker-operations.md)
@@ -36,12 +34,10 @@
     * [K3s 日常运维速查](cloud-native/k3s/k3s-operations.md)
     * [K3s 备份与恢复速查](cloud-native/k3s/k3s-backup-recovery.md)
     * [产品运行底座：K3s 集群部署手册](cloud-native/k3s/product-runtime-k3s-deployment.md)
-
 * [开发](development/README.md)
   * [工程平台](development/platforms/README.md)
     * [GitHub 发布](development/platforms/github-publishing.md)
-  * [技术栈与工具](development/tooling/README.md)
-
+  * [技术栈与工具](development/tooling.md)
 * [AI](ai/README.md)
   * [AI Coding](ai/coding/README.md)
     * [FDE 60 天技能表](ai/coding/fde-skills-roadmap.md)
@@ -53,17 +49,15 @@
   * [模型与接入](ai/model-access.md)
   * [提示词](ai/prompting.md)
   * [AI 资源](ai/resources.md)
-
 * [项目](projects/README.md)
   * [xmg-qa2](projects/xmg-qa2/README.md)
     * [技术支持专家 Agent 设计稿](projects/xmg-qa2/support-agent-design.md)
-
 * [Zwiki 使用与维护](wiki-ops/README.md)
   * [日常维护指南](wiki-ops/daily-operations.md)
   * [Zwiki 快速修改](wiki-ops/quick-edit-and-feedback.md)
   * [写入前检查](wiki-ops/write-checklist.md)
   * [错误回退与恢复](wiki-ops/rollback-guide.md)
-  * [文章编写规范](CONTRIBUTING.md)
-  * [通用技术文章模板](templates/technical-article.md)
-  * [故障排查模板](templates/troubleshooting.md)
-  * [部署指南模板](templates/deployment-guide.md)
+  * [文章编写规范](wiki-ops/contributing.md)
+  * [通用技术文章模板](wiki-ops/technical-article.md)
+  * [故障排查模板](wiki-ops/troubleshooting.md)
+  * [部署指南模板](wiki-ops/deployment-guide.md)

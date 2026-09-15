@@ -8,17 +8,17 @@ AI 维护默认采用全自动模式：完成写入后由 AI 自行审核全部�
 
 ## 操作入口
 
-- [日常维护指南](daily-operations.md)：目录选择、分类边界和常用增删改提示词，日常使用优先看这一页。
-- [写入前检查](write-checklist.md)：新增、修改、通过 GitBook URL 定位文章、添加附件前执行；文件内同时包含 AI 写入后的自动审核与发布要求。
-- [错误回退与恢复](rollback-guide.md)：写入后发现内容、索引或 GitBook 配置错误时执行。
-- [文章编写规范](../CONTRIBUTING.md)：只定义技术文章本身的标题、路径、命令、版本、来源和内容质量要求。
-- [通用技术文章模板](../templates/technical-article.md)
-- [故障排查模板](../templates/troubleshooting.md)
-- [部署指南模板](../templates/deployment-guide.md)
+* [日常维护指南](daily-operations.md)：目录选择、分类边界和常用增删改提示词，日常使用优先看这一页。
+* [写入前检查](write-checklist.md)：新增、修改、通过 GitBook URL 定位文章、添加附件前执行；文件内同时包含 AI 写入后的自动审核与发布要求。
+* [错误回退与恢复](rollback-guide.md)：写入后发现内容、索引或 GitBook 配置错误时执行。
+* [文章编写规范](contributing.md)：只定义技术文章本身的标题、路径、命令、版本、来源和内容质量要求。
+* [通用技术文章模板](technical-article.md)
+* [故障排查模板](troubleshooting.md)
+* [部署指南模板](deployment-guide.md)
 
 ## 默认维护流程
 
-```text
+```
 用户提出修改
     ↓
 AI 写入前检查

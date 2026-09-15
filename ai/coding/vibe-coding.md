@@ -9,12 +9,12 @@
 
 ## 文档信息
 
-- **技术领域**：AI Coding / Vibe Coding / Web 全栈开发
-- **适用范围**：新项目、现有项目功能开发、Bug 修复、小规模重构
-- **适用版本**：通用流程，具体框架版本以项目锁文件为准
-- **文档状态**：已验证流程规范
-- **最后验证**：2026-09-02
-- **来源**：FDE《从零开始，用 Coding Agent 产出可维护的代码》、Git/GitLab/React 等项目实践
+* **技术领域**：AI Coding / Vibe Coding / Web 全栈开发
+* **适用范围**：新项目、现有项目功能开发、Bug 修复、小规模重构
+* **适用版本**：通用流程，具体框架版本以项目锁文件为准
+* **文档状态**：已验证流程规范
+* **最后验证**：2026-09-02
+* **来源**：FDE《从零开始，用 Coding Agent 产出可维护的代码》、Git/GitLab/React 等项目实践
 
 ## 1. 核心原则
 
@@ -24,7 +24,7 @@
 
 正确方式是把开发过程拆成多个可独立验收的阶段：
 
-```text
+```
 需求与约束
   ↓ Gate 0
 架构与接口契约
@@ -52,14 +52,14 @@ FDE 原规范的核心判断是：优先选择社区主流、文档成熟、AI �
 
 推荐基线：
 
-| 场景 | 推荐技术栈 | 原因 |
-| --- | --- | --- |
-| 企业管理后台 | TypeScript + React + Ant Design + Vite | 强类型、组件标准化、资料多、AI 生成稳定 |
-| Web API / AI 应用后端 | Python + FastAPI + Pydantic | Python 生态与 AI/LLM 工具链统一，接口 Schema 清晰 |
-| 数据库 | PostgreSQL | 通用、成熟、SQL 能力完整 |
-| 客户机长期运行服务 | Go + Gin | 静态类型、单二进制、便于离线和跨平台交付 |
-| 本地集成 | Docker Compose | 环境一致、依赖可复现、便于整体验收 |
-| 版本与协作 | Git + Feature Branch + MR/PR + CI | 变更可比较、可回退、可审查 |
+| 场景                | 推荐技术栈                                  | 原因                                   |
+| ----------------- | -------------------------------------- | ------------------------------------ |
+| 企业管理后台            | TypeScript + React + Ant Design + Vite | 强类型、组件标准化、资料多、AI 生成稳定                |
+| Web API / AI 应用后端 | Python + FastAPI + Pydantic            | Python 生态与 AI/LLM 工具链统一，接口 Schema 清晰 |
+| 数据库               | PostgreSQL                             | 通用、成熟、SQL 能力完整                       |
+| 客户机长期运行服务         | Go + Gin                               | 静态类型、单二进制、便于离线和跨平台交付                 |
+| 本地集成              | Docker Compose                         | 环境一致、依赖可复现、便于整体验收                    |
+| 版本与协作             | Git + Feature Branch + MR/PR + CI      | 变更可比较、可回退、可审查                        |
 
 技术栈一旦在 Gate 0 确认，AI 不得自行切换框架、升级大版本或引入替代库。
 
@@ -67,7 +67,7 @@ FDE 原规范的核心判断是：优先选择社区主流、文档成熟、AI �
 
 每一个 Gate 内部都重复同一套最小闭环：
 
-```text
+```
 Inspect → Plan → Patch → Verify
 ```
 
@@ -75,11 +75,11 @@ Inspect → Plan → Patch → Verify
 
 AI 必须先检查：
 
-- 当前目录和项目结构；
-- `README`、`AGENTS.md`、规范文件；
-- 当前依赖与锁文件；
-- 相关代码和测试；
-- 当前 Git 状态和分支。
+* 当前目录和项目结构；
+* `README`、`AGENTS.md`、规范文件；
+* 当前依赖与锁文件；
+* 相关代码和测试；
+* 当前 Git 状态和分支。
 
 禁止未阅读现有实现就直接生成替代方案。
 
@@ -87,22 +87,22 @@ AI 必须先检查：
 
 AI 应明确：
 
-- 本次只改什么；
-- 不改什么；
-- 预计涉及哪些文件；
-- 如何验收；
-- 失败时如何回退。
+* 本次只改什么；
+* 不改什么；
+* 预计涉及哪些文件；
+* 如何验收；
+* 失败时如何回退。
 
 ### Patch：小步修改
 
 一次只实现一个明确目标：
 
-- 一个接口；
-- 一个数据模型；
-- 一个页面；
-- 一个表单流程；
-- 一个 Bug；
-- 一个小重构。
+* 一个接口；
+* 一个数据模型；
+* 一个页面；
+* 一个表单流程；
+* 一个 Bug；
+* 一个小重构。
 
 禁止一次大范围重写整个项目。
 
@@ -127,18 +127,18 @@ docker compose ps
 
 ### 输入
 
-- 用户目标；
-- 当前业务流程；
-- 必要功能；
-- 非目标；
-- 数据来源；
-- 运行环境和限制。
+* 用户目标；
+* 当前业务流程；
+* 必要功能；
+* 非目标；
+* 数据来源；
+* 运行环境和限制。
 
 ### AI 要完成
 
 输出一份简短规格：
 
-```text
+```
 目标
 非目标
 主要用户流程
@@ -152,19 +152,19 @@ docker compose ps
 
 ### 验收条件
 
-- 功能范围没有明显歧义；
-- 技术栈已经固定；
-- 明确哪些功能本期不做；
-- 已定义最终怎么判断项目成功。
+* 功能范围没有明显歧义；
+* 技术栈已经固定；
+* 明确哪些功能本期不做；
+* 已定义最终怎么判断项目成功。
 
 ### 阻断条件
 
 以下任一存在时禁止开始编码：
 
-- 数据来源未知；
-- 核心字段未定义；
-- 前后端框架未确定；
-- AI 仍需要自己“猜需求”。
+* 数据来源未知；
+* 核心字段未定义；
+* 前后端框架未确定；
+* AI 仍需要自己“猜需求”。
 
 ## 4. Gate 1：架构、数据模型和 API 契约
 
@@ -174,7 +174,7 @@ docker compose ps
 
 至少输出：
 
-```text
+```
 浏览器
   ↓
 Frontend
@@ -186,21 +186,21 @@ PostgreSQL / 外部 API / Agent Tool
 
 并确定：
 
-- 页面和路由清单；
-- 核心数据模型；
-- API URL、Method；
-- Request / Response Schema；
-- 错误码和错误结构；
-- 身份认证和权限边界。
+* 页面和路由清单；
+* 核心数据模型；
+* API URL、Method；
+* Request / Response Schema；
+* 错误码和错误结构；
+* 身份认证和权限边界。
 
 ### 验收条件
 
 前后端都能只看接口契约回答：
 
-- 请求发到哪里；
-- 需要哪些字段；
-- 返回哪些字段；
-- 失败时返回什么。
+* 请求发到哪里；
+* 需要哪些字段；
+* 返回哪些字段；
+* 失败时返回什么。
 
 **前端和后端禁止各自猜字段。**
 
@@ -210,7 +210,7 @@ PostgreSQL / 外部 API / Agent Tool
 
 至少具备：
 
-```text
+```
 backend/
 ├── app/
 │   ├── api/
@@ -226,7 +226,7 @@ backend/
 
 至少具备：
 
-```text
+```
 frontend/
 └── src/
     ├── api/
@@ -267,7 +267,7 @@ pnpm build
 
 推荐开发顺序：
 
-```text
+```
 数据模型
 → Schema
 → Repository / 数据访问
@@ -279,14 +279,14 @@ pnpm build
 
 ### 后端硬要求
 
-- 请求和响应有明确 Schema；
-- 参数必须校验；
-- 非 2xx 路径必须处理；
-- 业务逻辑不要全部写在路由函数；
-- Secret 不硬编码；
-- 数据库变更可迁移；
-- 关键路径有测试；
-- 日志能定位请求失败原因。
+* 请求和响应有明确 Schema；
+* 参数必须校验；
+* 非 2xx 路径必须处理；
+* 业务逻辑不要全部写在路由函数；
+* Secret 不硬编码；
+* 数据库变更可迁移；
+* 关键路径有测试；
+* 日志能定位请求失败原因。
 
 ### 验收条件
 
@@ -299,12 +299,12 @@ curl http://127.0.0.1:8000/api/users
 
 同时测试：
 
-- 正常请求；
-- 缺少必填字段；
-- 非法输入；
-- 不存在资源；
-- 权限失败（如果有权限）；
-- 数据库异常或外部 API 失败的关键路径。
+* 正常请求；
+* 缺少必填字段；
+* 非法输入；
+* 不存在资源；
+* 权限失败（如果有权限）；
+* 数据库异常或外部 API 失败的关键路径。
 
 后端接口不稳定时，不进入真实前后端联调。
 
@@ -312,7 +312,7 @@ curl http://127.0.0.1:8000/api/users
 
 前端推荐固定使用：
 
-```text
+```
 TypeScript strict
 React 函数组件 + Hooks
 Ant Design（企业后台）
@@ -323,7 +323,7 @@ Vite
 
 ### 开发顺序
 
-```text
+```
 Layout / 路由
 → 页面骨架
 → 列表 / 卡片
@@ -336,14 +336,14 @@ Layout / 路由
 
 ### 前端硬要求
 
-- TypeScript `strict` 开启；
-- 不用 `any` 逃避类型问题；
-- 页面组件与 API 层分离；
-- Loading / Empty / Error 状态完整；
-- 表单有校验和提交反馈；
-- 删除等危险操作有二次确认；
-- 控制台无红色错误；
-- 页面在目标分辨率下无明显溢出和错位。
+* TypeScript `strict` 开启；
+* 不用 `any` 逃避类型问题；
+* 页面组件与 API 层分离；
+* Loading / Empty / Error 状态完整；
+* 表单有校验和提交反馈；
+* 删除等危险操作有二次确认；
+* 控制台无红色错误；
+* 页面在目标分辨率下无明显溢出和错位。
 
 ### 验收条件
 
@@ -356,7 +356,7 @@ pnpm build
 
 并人工走通：
 
-```text
+```
 打开页面
 → 查看列表
 → 新增
@@ -368,13 +368,13 @@ pnpm build
 
 视觉验收至少检查：
 
-- 对齐；
-- 间距；
-- 字号层级；
-- 表格和表单密度；
-- 按钮主次；
-- Loading / Empty / Error 状态；
-- 响应式或目标分辨率。
+* 对齐；
+* 间距；
+* 字号层级；
+* 表格和表单密度；
+* 按钮主次；
+* Loading / Empty / Error 状态；
+* 响应式或目标分辨率。
 
 ## 8. Gate 5：前后端联调
 
@@ -384,7 +384,7 @@ pnpm build
 
 一次只联调一个用户流程，例如：
 
-```text
+```
 GET /users
 → 列表展示
 → 验收
@@ -406,12 +406,12 @@ DELETE /users/:id
 
 ### 验收条件
 
-- Network 中请求 URL、Method 正确；
-- Request 与 Schema 一致；
-- Response 与前端类型一致；
-- 401 / 403 / 404 / 422 / 500 能正确展示；
-- 前端没有直接依赖后端内部实现；
-- 后端不为迁就单个页面临时破坏公共 API 契约。
+* Network 中请求 URL、Method 正确；
+* Request 与 Schema 一致；
+* Response 与前端类型一致；
+* 401 / 403 / 404 / 422 / 500 能正确展示；
+* 前端没有直接依赖后端内部实现；
+* 后端不为迁就单个页面临时破坏公共 API 契约。
 
 ## 9. Gate 6：质量门禁和回归
 
@@ -421,16 +421,16 @@ FDE 原规范要求 AI 代码必须人工 Review，并强调依赖、错误路�
 
 ### 通用 Review Checklist
 
-- [ ] 改动范围符合任务，没有顺手重构无关文件
-- [ ] 新依赖确实必要且版本正确
-- [ ] 锁文件已更新
-- [ ] 没有硬编码 Token、密码、客户数据
-- [ ] 错误路径已处理
-- [ ] 命名和目录结构一致
-- [ ] 没有明显重复代码和超大文件
-- [ ] 没有遗留调试代码
-- [ ] 至少一个真实 happy path 已跑通
-- [ ] 核心边界条件有测试或手工验证记录
+* [ ] 改动范围符合任务，没有顺手重构无关文件
+* [ ] 新依赖确实必要且版本正确
+* [ ] 锁文件已更新
+* [ ] 没有硬编码 Token、密码、客户数据
+* [ ] 错误路径已处理
+* [ ] 命名和目录结构一致
+* [ ] 没有明显重复代码和超大文件
+* [ ] 没有遗留调试代码
+* [ ] 至少一个真实 happy path 已跑通
+* [ ] 核心边界条件有测试或手工验证记录
 
 ### 前端门禁
 
@@ -476,15 +476,15 @@ go build ./...
 
 ### 交付前必须明确
 
-- 环境变量清单；
-- 数据目录；
-- 端口；
-- 数据库初始化 / Migration；
-- 启动方式；
-- 健康检查；
-- 日志位置；
-- 备份方式；
-- 回退版本。
+* 环境变量清单；
+* 数据目录；
+* 端口；
+* 数据库初始化 / Migration；
+* 启动方式；
+* 健康检查；
+* 日志位置；
+* 备份方式；
+* 回退版本。
 
 Docker Compose 项目至少检查：
 
@@ -499,7 +499,7 @@ docker compose logs --tail=100
 
 陌生同事只根据 README / Runbook 应能完成：
 
-```text
+```
 获取代码或产物
 → 配置环境变量
 → 启动
@@ -536,11 +536,11 @@ git diff --staged
 
 禁止：
 
-- 在生产稳定分支直接让 AI 大面积修改；
-- 未检查 `git diff` 就提交；
-- 使用 `git push --force` 覆盖共享分支；
-- AI 自行删除未知文件；
-- AI 未经说明自动升级大量依赖。
+* 在生产稳定分支直接让 AI 大面积修改；
+* 未检查 `git diff` 就提交；
+* 使用 `git push --force` 覆盖共享分支；
+* AI 自行删除未知文件；
+* AI 未经说明自动升级大量依赖。
 
 需要重写 Feature 分支历史时优先：
 
@@ -552,7 +552,7 @@ git push --force-with-lease
 
 可将以下规则写入 `AGENTS.md` 或项目开发规范：
 
-```text
+```
 1. 修改前先阅读项目结构、README、AGENTS.md、相关代码和测试。
 2. 当前只处理用户指定的 Gate，不提前实现后续 Gate。
 3. 每次先给最小实施计划，再修改代码。
@@ -569,7 +569,7 @@ git push --force-with-lease
 
 对于一个典型“后台管理系统 + API”项目：
 
-```text
+```
 Day / Step 1
 需求规格 + 技术栈
 → 人工确认
@@ -605,7 +605,7 @@ Agent、RAG、MCP、Tool Calling 等能力应放在基础 Web 全栈闭环之后
 
 推荐顺序：
 
-```text
+```
 普通 API / 页面稳定
 → Agent 单一任务
 → 单一 Tool
@@ -632,17 +632,17 @@ Vibe Coding 的稳定性，不来自更长的 Prompt，而来自工程控制：
 
 ## 相关文档与资源
 
-- [AI Coding](README.md)
-- [技术栈与工具](../../development/tooling/README.md)
-- [Zwiki 编写与维护规范](../../CONTRIBUTING.md)
-- [通用技术文章模板](../../templates/technical-article.md)
-- [GitHub .gitignore 模板](https://github.com/github/gitignore)
-- [Conventional Commits](https://www.conventionalcommits.org/)
-- [GitLab CI/CD](https://docs.gitlab.com/ee/ci/)
-- [TypeScript](https://www.typescriptlang.org/docs/)
-- [React](https://react.dev/)
-- [Ant Design](https://ant.design/components/overview-cn/)
-- [Vite](https://vite.dev/)
-- [FastAPI](https://fastapi.tiangolo.com/)
-- [Gin](https://gin-gonic.com/)
-- [GORM](https://gorm.io/)
+* [AI Coding](./)
+* [技术栈与工具](../../development/tooling.md)
+* [Zwiki 编写与维护规范](../../wiki-ops/contributing.md)
+* [通用技术文章模板](../../wiki-ops/technical-article.md)
+* [GitHub .gitignore 模板](https://github.com/github/gitignore)
+* [Conventional Commits](https://www.conventionalcommits.org/)
+* [GitLab CI/CD](https://docs.gitlab.com/ee/ci/)
+* [TypeScript](https://www.typescriptlang.org/docs/)
+* [React](https://react.dev/)
+* [Ant Design](https://ant.design/components/overview-cn/)
+* [Vite](https://vite.dev/)
+* [FastAPI](https://fastapi.tiangolo.com/)
+* [Gin](https://gin-gonic.com/)
+* [GORM](https://gorm.io/)

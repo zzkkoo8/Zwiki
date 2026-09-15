@@ -4,25 +4,25 @@
 
 ## 常用速查
 
-- [K3s 日常运维速查](k3s-operations.md)：Server/Agent、日志、containerd、镜像导入、私仓和内置组件检查。
-- [K3s 备份与恢复速查](k3s-backup-recovery.md)：datastore 类型判断、embedded etcd snapshot、Server Token、恢复前检查和升级前保护。
+* [K3s 日常运维速查](k3s-operations.md)：Server/Agent、日志、containerd、镜像导入、私仓和内置组件检查。
+* [K3s 备份与恢复速查](k3s-backup-recovery.md)：datastore 类型判断、embedded etcd snapshot、Server Token、恢复前检查和升级前保护。
 
 ## 部署手册
 
-- [产品运行底座：K3s 集群部署手册](product-runtime-k3s-deployment.md)：面向产品集群版底座，覆盖部署前硬件/OS/网络/数据盘检查、chroot + Ansible、安装参数和安装后验收。
+* [产品运行底座：K3s 集群部署手册](product-runtime-k3s-deployment.md)：面向产品集群版底座，覆盖部署前硬件/OS/网络/数据盘检查、chroot + Ansible、安装参数和安装后验收。
 
 ## 收录范围
 
-- Server、Agent 安装与节点加入
-- 高可用、嵌入式 etcd 和外部数据库
-- containerd、Traefik、ServiceLB 和 Local Path Provisioner
-- 配置文件、启动参数、数据目录和日志
-- 离线安装、镜像导入与私有仓库
-- 证书、Token、备份、恢复和升级
-- 断电重启、节点异常和集群恢复
+* Server、Agent 安装与节点加入
+* 高可用、嵌入式 etcd 和外部数据库
+* containerd、Traefik、ServiceLB 和 Local Path Provisioner
+* 配置文件、启动参数、数据目录和日志
+* 离线安装、镜像导入与私有仓库
+* 证书、Token、备份、恢复和升级
+* 断电重启、节点异常和集群恢复
 
 ## 与 Kubernetes 的边界
 
-资源对象、调度、Service、Ingress 等通用概念放在 [Kubernetes](../kubernetes/README.md)；只有 K3s 的实现、默认组件或管理方式不同，才放在本目录。
+资源对象、调度、Service、Ingress 等通用概念放在 [Kubernetes](../kubernetes/)；只有 K3s 的实现、默认组件或管理方式不同，才放在本目录。
 
-新增文章优先使用[部署指南模板](../../templates/deployment-guide.md)或[故障排查模板](../../templates/troubleshooting.md)。
+新增文章优先使用[部署指南模板](../../wiki-ops/deployment-guide.md)或[故障排查模板](../../wiki-ops/troubleshooting.md)。
