@@ -70,8 +70,12 @@ node02 ansible_host=192.168.1.102 ansible_user=root ansible_password=CHANGE_ME_0
 [linux:vars]
 ansible_user=admin
 ansible_password=CHANGE_ME
+ansible_become=true
+ansible_become_method=sudo
 ansible_become_password=CHANGE_ME
 ```
+
+普通管理员方案要求该账号**已经具备 sudo 权限**；如果没有，只能使用 root 或其他既有特权通道完成首次 bootstrap。
 
 临时明文 Inventory：
 
