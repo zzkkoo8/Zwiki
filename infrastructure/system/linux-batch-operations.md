@@ -1,43 +1,77 @@
 # Linux 批量运维速查
 
-用于从一台控制机批量管理 Linux 主机。**不需要先逐台手工写 SSH 公钥。**
+从一台控制机批量管理 Linux，优先使用 **Ansible**。首次使用不需要逐台执行 `ssh-copy-id`：目标机已经允许 SSH 密码登录时，直接使用 `-k` 临时输入 SSH 密码即可。
 
-## 直接选方案
-
-| 场景 | 最简方案 |
-| --- | --- |
-| 只执行一次短任务 | Ansible 直接用现有账号密码，任务结束删除临时 Inventory |
-| 不想让后续任务继续使用 root/管理员密码 | 密码只做一次 bootstrap，自动创建临时账号 + 临时 SSH Key |
-| 多人、自动化、持续一段时间批量操作 | 临时账号 + 临时 Key + 临时 sudo，结束后统一 cleanup |
-
-如果只是临时执行几条命令，**直接密码认证最简单，不需要创建 Key，也不需要修改服务器权限。**
-
-如果需要把 root/管理员密码与后续批量任务隔离，推荐：
+推荐主线：
 
 ```text
-已有 root / 管理员密码
-        ↓
-Ansible 一次性 bootstrap
-        ↓
-创建临时账号 ops-maint
-写入一次性 SSH 公钥
-临时授予 sudo
-设置次日自动过期
-        ↓
-后续全部使用临时 SSH Key
-        ↓
-任务完成
-        ↓
-cleanup 删除 sudoers、账号、公钥、控制端私钥
+安装 Ansible
+    ↓
+写 inventory.ini
+    ↓
+-k 使用现有 SSH 密码连接
+    ↓
+先验证 1 台
+    ↓
+小批量 / 全量执行
 ```
 
-**安全底线：**先 `--limit node01` 验证一台；原有管理员登录通道确认可用前，不要修改或关闭它。
+以下示例假设管理 10 台 Linux：`192.168.1.101` ～ `192.168.1.110`。
 
-以下假设管理 10 台 Linux：`192.168.1.101` ～ `192.168.1.110`。
+## 1. 安装 Ansible
 
-## 1. 最短方案：直接密码批量运维
+控制机执行：
 
-`inventory-bootstrap.ini`：
+```bash
+python3 -m pip install ansible
+ansible --version
+```
+
+也可以直接使用发行版提供的 Ansible 包。完整安装方式以官方文档为准。
+
+建立工作目录：
+
+```bash
+mkdir -p ~/ansible-ops
+cd ~/ansible-ops
+```
+
+建议只保留这几个文件：
+
+```text
+ansible-ops/
+├── ansible.cfg
+├── inventory.ini
+└── check.yml
+```
+
+## 2. 最小配置文件
+
+### ansible.cfg
+
+```ini
+[defaults]
+inventory = ./inventory.ini
+forks = 10
+timeout = 10
+host_key_checking = True
+```
+
+说明：
+
+- `forks = 10`：最多并发 10 台；
+- `timeout = 10`：SSH 连接超时 10 秒；
+- `host_key_checking = True`：默认保留 SSH 主机身份校验。
+
+临时隔离测试网确实不需要校验主机指纹时，才临时改成：
+
+```ini
+host_key_checking = False
+```
+
+生产环境建议保持 `True`。
+
+### inventory.ini
 
 ```ini
 [linux]
@@ -54,410 +88,296 @@ node10 ansible_host=192.168.1.110
 
 [linux:vars]
 ansible_user=root
-ansible_password=CHANGE_ME
 ```
 
-每台密码不同，直接写到主机行：
+先确认 Inventory：
 
-```ini
-node01 ansible_host=192.168.1.101 ansible_user=root ansible_password=CHANGE_ME_01
-node02 ansible_host=192.168.1.102 ansible_user=root ansible_password=CHANGE_ME_02
+```bash
+ansible-inventory --graph
+ansible linux --list-hosts
 ```
 
-普通管理员账号 + sudo：
+## 3. 密码相同：直接 `-k`
+
+这是现场批量运维最简单的方式，**不需要先写公钥，也不需要把密码保存到配置文件。**
+
+先测试 1 台：
+
+```bash
+ansible node01 \
+  -m ansible.builtin.raw \
+  -a 'hostname; uptime' \
+  -k
+```
+
+Ansible 会提示输入 SSH 密码：
+
+```text
+SSH password:
+```
+
+确认成功后执行全部主机：
+
+```bash
+ansible linux \
+  -m ansible.builtin.raw \
+  -a 'hostname; uptime; df -hT; free -h' \
+  -k
+```
+
+`-k` 即 `--ask-pass`，适合同一批主机使用相同 SSH 密码的场景。
+
+## 4. 普通管理员 + sudo
+
+Inventory 改为：
 
 ```ini
 [linux:vars]
-ansible_user=admin
-ansible_password=CHANGE_ME
-ansible_become=true
-ansible_become_method=sudo
-ansible_become_password=CHANGE_ME
+ansible_user=ops
 ```
 
-普通管理员方案要求该账号**已经具备 sudo 权限**；如果没有，只能使用 root 或其他既有特权通道完成首次 bootstrap。
-
-临时明文 Inventory：
+执行需要 sudo 的命令：
 
 ```bash
-chmod 600 inventory-bootstrap.ini
+ansible linux \
+  -m ansible.builtin.command \
+  -a 'id' \
+  -k \
+  -b \
+  -K
 ```
 
-不要提交到 Git；需要长期保存时改用 `ansible-vault`。
-
-目标机没有 Python 也可以先用 `raw`：
-
-```bash
-ansible linux -i inventory-bootstrap.ini \
-  -m ansible.builtin.raw \
-  -a 'hostname; id; command -v python3 || true'
-```
-
-一次性任务直接执行：
-
-```bash
-ansible linux -i inventory-bootstrap.ini \
-  -m ansible.builtin.shell \
-  -a 'hostname; uptime; df -hT; free -h'
-```
-
-执行结束：
-
-```bash
-rm -f inventory-bootstrap.ini
-```
-
-这种方式不会在目标机留下额外账号或 SSH Key。
-
-## 2. 推荐方案：自动创建临时账号和 Key
-
-适合后续批量任务不再携带 root/管理员密码的场景。
-
-### 2.1 生成一次性 SSH Key
-
-控制机执行：
-
-```bash
-umask 077
-mkdir -p .keys
-ssh-keygen -q \
-  -t ed25519 \
-  -N '' \
-  -C "zwiki-temp-ops-$(date +%Y%m%d-%H%M%S)" \
-  -f .keys/ops-maint
-```
-
-只用于本次任务：
+参数含义：
 
 ```text
-.keys/ops-maint       临时私钥
-.keys/ops-maint.pub   临时公钥
+-k    临时输入 SSH 登录密码
+-b    使用 become/sudo 提权
+-K    临时输入 sudo 密码
 ```
 
-### 2.2 Bootstrap
+这种方式不需要永久修改目标机权限；前提是 `ops` 本来就具备 sudo 权限。
 
-创建 `bootstrap.yml`：
+## 5. 每台密码不同
 
-```yaml
----
-- name: Bootstrap temporary operations access
-  hosts: linux
-  gather_facts: false
-
-  vars:
-    temp_user: ops-maint
-    temp_marker: Zwiki temporary operations
-    temp_pubkey: "{{ lookup('file', playbook_dir + '/.keys/ops-maint.pub') }}"
-
-  tasks:
-    - name: Create temporary user, key, sudo and Python
-      ansible.builtin.raw: |
-        set -eu
-
-        user={{ temp_user | quote }}
-        marker={{ temp_marker | quote }}
-        pubkey={{ temp_pubkey | quote }}
-        expire="$(date -d '+1 day' +%F)"
-
-        if id "$user" >/dev/null 2>&1; then
-          current_marker="$(getent passwd "$user" | cut -d: -f5)"
-          [ "$current_marker" = "$marker" ] || {
-            echo "refuse to reuse existing account: $user"
-            exit 3
-          }
-          usermod -s /bin/bash "$user"
-          chage -E "$expire" "$user"
-        else
-          useradd -m -s /bin/bash -c "$marker" -e "$expire" "$user"
-        fi
-
-        random_pw="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 48)"
-        printf '%s:%s\n' "$user" "$random_pw" | chpasswd
-        unset random_pw
-
-        home="$(getent passwd "$user" | cut -d: -f6)"
-        install -d -m 700 -o "$user" -g "$user" "$home/.ssh"
-        printf '%s\n' "$pubkey" > "$home/.ssh/authorized_keys"
-        chown "$user:$user" "$home/.ssh/authorized_keys"
-        chmod 600 "$home/.ssh/authorized_keys"
-
-        if ! command -v visudo >/dev/null 2>&1; then
-          if command -v dnf >/dev/null 2>&1; then
-            dnf install -y sudo
-          elif command -v yum >/dev/null 2>&1; then
-            yum install -y sudo
-          elif command -v apt-get >/dev/null 2>&1; then
-            apt-get update
-            DEBIAN_FRONTEND=noninteractive apt-get install -y sudo
-          else
-            echo 'sudo/visudo missing and no supported package manager found'
-            exit 1
-          fi
-        fi
-
-        mkdir -p /etc/sudoers.d
-        tmp="$(mktemp)"
-        printf '%s ALL=(ALL) NOPASSWD: ALL\n' "$user" > "$tmp"
-        chmod 440 "$tmp"
-        visudo -cf "$tmp" >/dev/null
-        install -o root -g root -m 440 "$tmp" "/etc/sudoers.d/$user"
-        rm -f "$tmp"
-
-        su - "$user" -c 'sudo -n true'
-
-        if ! command -v python3 >/dev/null 2>&1; then
-          if command -v dnf >/dev/null 2>&1; then
-            dnf install -y python3
-          elif command -v yum >/dev/null 2>&1; then
-            yum install -y python3
-          elif command -v apt-get >/dev/null 2>&1; then
-            apt-get update
-            DEBIAN_FRONTEND=noninteractive apt-get install -y python3
-          else
-            echo 'Python missing and no supported package manager found'
-            exit 2
-          fi
-        fi
-```
-
-说明：
-
-- `ops-maint` 使用随机未知密码，实际只通过本次临时公钥登录；
-- 如果目标机已经存在同名但不是本流程创建的账号，Bootstrap 会停止，不会接管已有账号；
-- `NOPASSWD: ALL` 只给临时账号使用；如果本次只做只读检查，可以删除 sudoers 部分；
-- 账号设置为次日过期，仅作为忘记 cleanup 时的兜底。
-
-先只执行一台：
-
-```bash
-ansible-playbook \
-  -i inventory-bootstrap.ini \
-  bootstrap.yml \
-  --limit node01
-```
-
-确认原有管理员通道仍正常后再继续。
-
-## 3. 切换到临时 Key
-
-`inventory-ops.ini`：
+`-k` 只能方便地处理一批共用密码的主机。每台密码不同，可临时写入 Inventory：
 
 ```ini
 [linux]
-node01 ansible_host=192.168.1.101
-node02 ansible_host=192.168.1.102
-node03 ansible_host=192.168.1.103
-node04 ansible_host=192.168.1.104
-node05 ansible_host=192.168.1.105
-node06 ansible_host=192.168.1.106
-node07 ansible_host=192.168.1.107
-node08 ansible_host=192.168.1.108
-node09 ansible_host=192.168.1.109
-node10 ansible_host=192.168.1.110
-
-[linux:vars]
-ansible_user=ops-maint
-ansible_private_key_file=./.keys/ops-maint
-ansible_become=true
+node01 ansible_host=192.168.1.101 ansible_user=root ansible_password=CHANGE_ME_01
+node02 ansible_host=192.168.1.102 ansible_user=root ansible_password=CHANGE_ME_02
+node03 ansible_host=192.168.1.103 ansible_user=root ansible_password=CHANGE_ME_03
 ```
 
-验证 `node01`：
+保护文件：
 
 ```bash
-ansible node01 -i inventory-ops.ini \
+chmod 600 inventory.ini
+```
+
+此时执行命令不需要 `-k`：
+
+```bash
+ansible linux \
   -m ansible.builtin.raw \
-  -a 'id; sudo -n id; chage -l ops-maint | grep "Account expires"'
+  -a 'hostname; uptime'
 ```
 
-验证通过后全量开启：
+任务完成后删除或清理密码：
 
 ```bash
-ansible-playbook -i inventory-bootstrap.ini bootstrap.yml
+rm -f inventory.ini
 ```
 
-再测试：
+如果配置需要长期保存，不要长期明文保存 `ansible_password`，改用 `ansible-vault`。
+
+## 6. 目标机没有 Python
+
+Ansible 大多数标准模块需要目标机存在 Python，但 `ansible.builtin.raw` 不需要远端 Python，因此第一次接管未知 Linux 时优先用 `raw`。
+
+检查：
 
 ```bash
-ansible linux -i inventory-ops.ini -m ansible.builtin.ping
-```
-
-### Python 缺失或版本太低
-
-Bootstrap 会在常见 RPM / DEB 系统尝试安装 `python3`。
-
-如果系统 Python 太旧：
-
-```bash
-ansible linux -i inventory-ops.ini \
+ansible linux \
   -m ansible.builtin.raw \
-  -a 'python3 --version 2>/dev/null || true'
+  -a 'hostname; command -v python3 || command -v python || true' \
+  -k
 ```
 
-不要覆盖系统 Python。优先并行安装新版本，例如 `/usr/bin/python3.11`，再指定：
-
-```ini
-[linux:vars]
-ansible_python_interpreter=/usr/bin/python3.11
-```
-
-内网环境见 [Linux 离线软件安装速查](linux-offline-package-management.md)。
-
-## 4. 常用批量操作
-
-系统状态：
+RPM 系需要安装 Python 时：
 
 ```bash
-ansible linux -i inventory-ops.ini \
+ansible linux \
+  -m ansible.builtin.raw \
+  -a 'dnf -y install python3 || yum -y install python3' \
+  -k
+```
+
+如果使用普通管理员账号，在命令末尾增加：
+
+```text
+-b -K
+```
+
+Debian / Ubuntu：
+
+```bash
+ansible linux \
+  -m ansible.builtin.raw \
+  -a 'apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y python3' \
+  -k
+```
+
+安装完成后验证标准模块：
+
+```bash
+ansible linux -m ansible.builtin.ping -k
+```
+
+系统 Python 版本太低时，不要直接替换系统 Python；优先并行安装新版本，再通过 `ansible_python_interpreter` 指定。内网环境见 [Linux 离线软件安装速查](linux-offline-package-management.md)。
+
+## 7. 高频命令
+
+查看主机状态：
+
+```bash
+ansible linux \
   -m ansible.builtin.shell \
-  -a 'hostname; uptime; df -hT; free -h'
+  -a 'hostname; uptime; df -hT; free -h' \
+  -k
 ```
 
-并发 5 台：
+只操作一台：
 
 ```bash
-ansible linux -i inventory-ops.ini \
+ansible node01 \
   -m ansible.builtin.command \
   -a 'uptime' \
-  -f 5
+  -k
 ```
 
-复制并执行脚本：
+限制并发为 5：
 
 ```bash
-ansible linux -i inventory-ops.ini \
-  -m ansible.builtin.copy \
-  -a 'src=./check.sh dest=/tmp/check.sh mode=0755'
+ansible linux \
+  -m ansible.builtin.command \
+  -a 'uptime' \
+  -f 5 \
+  -k
+```
 
-ansible linux -i inventory-ops.ini \
+复制文件：
+
+```bash
+ansible linux \
+  -m ansible.builtin.copy \
+  -a 'src=./check.sh dest=/tmp/check.sh mode=0755' \
+  -k
+```
+
+执行本地脚本：
+
+```bash
+ansible linux \
   -m ansible.builtin.script \
-  -a './check.sh'
+  -a './check.sh' \
+  -k
 ```
 
 安装软件：
 
 ```bash
-ansible linux -i inventory-ops.ini \
-  -b \
+ansible linux \
   -m ansible.builtin.package \
-  -a 'name=tmux state=present'
+  -a 'name=tmux state=present' \
+  -k \
+  -b \
+  -K
 ```
 
-有变更的任务固定遵循：
+## 8. Playbook 最小样例
 
-```text
---limit 先跑 1 台 → serial 小批量 → 全量验证
-```
-
-例如：
+`check.yml`：
 
 ```yaml
 ---
-- name: Batch change
+- name: Linux batch check
   hosts: linux
-  serial: 2
+  gather_facts: false
+  serial: 5
 
   tasks:
     - name: Check uptime
       ansible.builtin.command: uptime
       changed_when: false
+
+    - name: Check disk
+      ansible.builtin.command: df -hT
+      changed_when: false
 ```
 
-## 5. 用完立即关闭临时权限
-
-Cleanup 必须使用最初的 `inventory-bootstrap.ini`，不要让 `ops-maint` 自己删除自己。
-
-`cleanup.yml`：
-
-```yaml
----
-- name: Revoke temporary operations access
-  hosts: linux
-  gather_facts: false
-
-  vars:
-    temp_user: ops-maint
-
-  tasks:
-    - name: Remove sudo, key and temporary account
-      ansible.builtin.raw: |
-        set -eu
-
-        user={{ temp_user | quote }}
-        rm -f "/etc/sudoers.d/$user"
-
-        if id "$user" >/dev/null 2>&1; then
-          home="$(getent passwd "$user" | cut -d: -f6)"
-          rm -f "$home/.ssh/authorized_keys"
-          usermod -L -s /sbin/nologin "$user" 2>/dev/null || true
-          userdel -r "$user" 2>/dev/null || true
-        fi
-```
-
-先回收一台：
+先验证一台：
 
 ```bash
-ansible-playbook \
-  -i inventory-bootstrap.ini \
-  cleanup.yml \
-  --limit node01
+ansible-playbook check.yml \
+  --limit node01 \
+  -k
 ```
 
-验证：
+确认后执行全部：
 
 ```bash
-ansible node01 -i inventory-bootstrap.ini \
+ansible-playbook check.yml -k
+```
+
+涉及软件安装、配置修改、服务重启等变更任务时，继续使用：
+
+```text
+--limit 1 台验证
+    ↓
+serial 小批量
+    ↓
+全量执行
+    ↓
+结果验证
+```
+
+## 9. 推荐现场用法
+
+### 一次性批量检查
+
+```bash
+ansible linux \
   -m ansible.builtin.raw \
-  -a 'test ! -e /etc/sudoers.d/ops-maint && ! id ops-maint >/dev/null 2>&1 && echo REVOKED'
+  -a 'hostname; uptime; df -hT; free -h' \
+  -k
 ```
 
-确认后全量回收：
-
-```bash
-ansible-playbook -i inventory-bootstrap.ini cleanup.yml
-```
-
-最后删除控制端凭据：
-
-```bash
-rm -f .keys/ops-maint .keys/ops-maint.pub
-rm -f inventory-bootstrap.ini
-```
-
-如果 `userdel` 因残留进程失败，脚本已经先删除 sudoers、公钥并把账号改成 `nologin`；此时远程批量登录权限已被回收，再单独清理残留账号即可。
-
-## 6. Windows / macOS
-
-Linux / macOS 可以直接作为 Ansible 控制端。
-
-Windows 长期运维建议：
+特点：
 
 ```text
-Windows → SSH → Linux 控制机 → Ansible → 多台 Linux
+不下发 SSH Key
+不创建临时账号
+不修改 sshd
+密码不写配置文件
+执行完即结束
 ```
 
-Windows 临时几条命令可用 PowerShell + OpenSSH；涉及账号、sudo、文件下发、失败重试和权限回收时，统一使用上面的 Ansible 流程。
-
-## 最终推荐
+### 重复执行的标准任务
 
 ```text
-一次短任务
-  → 直接密码 Inventory
-  → 批量执行
-  → 删除 Inventory
-
-需要隔离管理员密码
-  → 密码只做 bootstrap
-  → 临时账号 + 临时 Key
-  → Ansible 批量运维
-  → cleanup 强制回收
+inventory.ini
+    +
+ansible.cfg
+    +
+playbook.yml
 ```
 
-这样既省掉逐台手工写公钥，也避免永久 root Key 或永久 sudo 账号。
+密码相同时继续用 `-k` / `-K` 临时输入；需要长期保存不同主机密码时再使用 `ansible-vault`。
 
 ## 官方资料
 
-- Ansible `raw`：https://docs.ansible.com/projects/ansible/latest/collections/ansible/builtin/raw_module.html
-- Ansible SSH Connection：https://docs.ansible.com/projects/ansible/latest/collections/ansible/builtin/ssh_connection.html
-- Ansible Inventory：https://docs.ansible.com/projects/ansible/latest/inventory_guide/intro_inventory.html
-- Ansible User：https://docs.ansible.com/projects/ansible/latest/collections/ansible/builtin/user_module.html
+- Ansible Getting Started：https://docs.ansible.com/projects/ansible/latest/getting_started/index.html
+- Inventory：https://docs.ansible.com/projects/ansible/latest/inventory_guide/intro_inventory.html
+- SSH Connection：https://docs.ansible.com/projects/ansible/latest/collections/ansible/builtin/ssh_connection.html
+- `raw` 模块：https://docs.ansible.com/projects/ansible/latest/collections/ansible/builtin/raw_module.html
 - Ansible Vault：https://docs.ansible.com/projects/ansible/latest/vault_guide/index.html
