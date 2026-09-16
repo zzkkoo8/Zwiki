@@ -31,11 +31,11 @@ nc -zv -w 3 <TARGET_IP> <PORT>
 没有 `nc` / `telnet` 时，优先用 Bash 自带的 `/dev/tcp`：
 
 ```bash
-timeout 3 bash -c '</dev/tcp/<TARGET_IP>/<PORT>'
+timeout 3 bash -c ': >/dev/tcp/<TARGET_IP>/<PORT>'
 echo $?
 ```
 
-返回 `0` 代表 TCP 建连成功，不代表上层协议一定正常。更多无安装依赖的替代方法见[第 5 节](#5-目标端口没有-telnet--nc-也能测)。
+返回 `0` 代表 TCP 建连成功，不代表上层协议一定正常。更多无安装依赖的替代方法见第 5 节。
 
 HTTP/HTTPS：
 
@@ -178,7 +178,7 @@ ip route get <TARGET_IP>
 单端口：
 
 ```bash
-timeout 3 bash -c '</dev/tcp/<TARGET_IP>/<PORT>' \
+timeout 3 bash -c ': >/dev/tcp/<TARGET_IP>/<PORT>' \
   && echo '<PORT> OPEN' \
   || echo '<PORT> FAIL'
 ```
@@ -187,7 +187,7 @@ timeout 3 bash -c '</dev/tcp/<TARGET_IP>/<PORT>' \
 
 ```bash
 for port in 443 8000 50051; do
-    if timeout 3 bash -c "</dev/tcp/<TARGET_IP>/$port" 2>/dev/null; then
+    if timeout 3 bash -c ": >/dev/tcp/<TARGET_IP>/$port" 2>/dev/null; then
         echo "$port OPEN"
     else
         echo "$port FAIL"
@@ -199,7 +199,7 @@ done
 
 ```bash
 for port in 443 8000 50051; do
-    if timeout 3 bash -c "</dev/tcp/10.7.216.249/$port" 2>/dev/null; then
+    if timeout 3 bash -c ": >/dev/tcp/10.7.216.249/$port" 2>/dev/null; then
         echo "$port OPEN"
     else
         echo "$port FAIL"
@@ -207,7 +207,9 @@ for port in 443 8000 50051; do
 done
 ```
 
-这类命令只建立 TCP 连接，副作用很小，但仍可能被目标服务、防火墙或审计系统记录。`/dev/tcp` 是 Bash 特性，不是所有 `/bin/sh` 都支持，所以要明确写 `bash -c`。
+这里用 `:` 配合输出重定向，只建立并立即关闭 TCP 连接，不发送应用数据。副作用很小，但仍可能被目标服务、防火墙或审计系统记录。`/dev/tcp` 是 Bash 特性，不是所有 `/bin/sh` 都支持，所以要明确写 `bash -c`。
+
+如果系统连 `timeout` 也没有，优先改用下面的 Python 或 `curl --connect-timeout` 方法，避免让一次连接尝试长时间阻塞。
 
 ### 5.2 有 curl：HTTP / HTTPS
 
@@ -239,7 +241,7 @@ curl -v --resolve <DOMAIN>:443:<TARGET_IP> https://<DOMAIN>/
 
 `-k` 会跳过证书校验，只用于排障。
 
-如果不知道目标是什么应用协议，但机器只有 `curl`，可将 `telnet://` 作为通用 TCP 建连兜底：
+如果不知道目标是什么应用协议，但机器只有 `curl`，且 `curl --version` 的 Protocols 中包含 `telnet`，可将 `telnet://` 作为通用 TCP 建连兜底：
 
 ```bash
 curl -v --connect-timeout 3 --max-time 3 telnet://<TARGET_IP>:<PORT> </dev/null
@@ -307,11 +309,15 @@ wget --spider -T 3 https://<TARGET_IP>:<PORT>/
 busybox --list | grep '^nc$'
 ```
 
-有的话：
+有的话可直接尝试 TCP 建连：
 
 ```bash
-busybox nc -z -w 3 <TARGET_IP> <PORT>
+timeout 3 busybox nc <TARGET_IP> <PORT> </dev/null \
+  && echo '<PORT> OPEN' \
+  || echo '<PORT> FAIL'
 ```
+
+BusyBox 不同版本的 `nc` 参数并不完全一致，需要零 I/O 扫描参数时先执行 `busybox nc --help`，不要直接假设一定支持 `-z`。
 
 已安装 `nmap` 时：
 
