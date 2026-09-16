@@ -28,14 +28,14 @@ ping -c 4 <TARGET_IP>
 nc -zv -w 3 <TARGET_IP> <PORT>
 ```
 
-没有 `nc` 时，Bash 可测试 TCP 建连：
+没有 `nc` / `telnet` 时，优先用 Bash 自带的 `/dev/tcp`：
 
 ```bash
-timeout 3 bash -c '</dev/tcp/<TARGET_IP>/<PORT>'
+timeout 3 bash -c ': >/dev/tcp/<TARGET_IP>/<PORT>'
 echo $?
 ```
 
-返回 `0` 代表 TCP 建连成功，不代表上层协议一定正常。
+返回 `0` 代表 TCP 建连成功，不代表上层协议一定正常。更多无安装依赖的替代方法见第 5 节。
 
 HTTP/HTTPS：
 
@@ -153,33 +153,201 @@ dig @<DNS_SERVER> <DOMAIN>
 grep -vE '^\s*(#|$)' /etc/hosts
 ```
 
-## 5. 目标端口
+## 5. 目标端口：没有 telnet / nc 也能测
 
-TCP：
-
-```bash
-nc -zv -w 3 <TARGET_IP> <PORT>
-```
-
-无 nc：
+先确认到目标 IP 的实际路由：
 
 ```bash
-timeout 3 bash -c '</dev/tcp/<TARGET_IP>/<PORT>'
+ip route get <TARGET_IP>
 ```
+
+端口探测方法按现场优先级使用：
+
+| 方法 | 适合场景 | 是否需要额外安装 |
+| --- | --- | --- |
+| Bash `/dev/tcp` | 任意 TCP 端口，现场首选 | 通常不需要 |
+| `curl` | HTTP/HTTPS；也可做通用 TCP 建连兜底 | 常见系统已有 |
+| `openssl s_client` | TLS/HTTPS 端口 | 常见系统已有 |
+| Python `socket` | 任意 TCP 端口、批量检查 | 需要已有 Python |
+| `wget --spider` | HTTP/HTTPS | 需要已有 wget |
+| `busybox nc` | 系统有 BusyBox 但没有独立 nc | 需要已有 BusyBox |
+| `nmap` | 多端口扫描、需要明确 open/closed/filtered | 需要已有 nmap |
+
+### 5.1 首选：Bash `/dev/tcp`
+
+单端口：
+
+```bash
+timeout 3 bash -c ': >/dev/tcp/<TARGET_IP>/<PORT>' \
+  && echo '<PORT> OPEN' \
+  || echo '<PORT> FAIL'
+```
+
+多端口：
+
+```bash
+for port in 443 8000 50051; do
+    if timeout 3 bash -c ": >/dev/tcp/<TARGET_IP>/$port" 2>/dev/null; then
+        echo "$port OPEN"
+    else
+        echo "$port FAIL"
+    fi
+done
+```
+
+例如检查 `10.7.216.249`：
+
+```bash
+for port in 443 8000 50051; do
+    if timeout 3 bash -c ": >/dev/tcp/10.7.216.249/$port" 2>/dev/null; then
+        echo "$port OPEN"
+    else
+        echo "$port FAIL"
+    fi
+done
+```
+
+这里用 `:` 配合输出重定向，只建立并立即关闭 TCP 连接，不发送应用数据。副作用很小，但仍可能被目标服务、防火墙或审计系统记录。`/dev/tcp` 是 Bash 特性，不是所有 `/bin/sh` 都支持，所以要明确写 `bash -c`。
+
+如果系统连 `timeout` 也没有，优先改用下面的 Python 或 `curl --connect-timeout` 方法，避免让一次连接尝试长时间阻塞。
+
+### 5.2 有 curl：HTTP / HTTPS
 
 HTTP：
 
 ```bash
-curl -v --connect-timeout 3 http://<TARGET_IP>:<PORT>/
+curl -v --connect-timeout 3 --max-time 5 http://<TARGET_IP>:<PORT>/
 ```
 
-HTTPS 指定 Host/SNI 时可用域名直接请求；如果必须绕过 DNS 定向到某 IP：
+HTTPS：
+
+```bash
+curl -vk --connect-timeout 3 --max-time 5 https://<TARGET_IP>:<PORT>/
+```
+
+只要输出中出现类似：
+
+```text
+Connected to <TARGET_IP> (<TARGET_IP>) port <PORT>
+```
+
+就说明 TCP 已经建立。后续即使返回 `401`、`403`、`404`，也说明网络和端口本身通常已经通了。
+
+依赖 Host/SNI 的 HTTPS 服务，优先使用域名；必须绕过 DNS 指定 IP 时：
 
 ```bash
 curl -v --resolve <DOMAIN>:443:<TARGET_IP> https://<DOMAIN>/
 ```
 
-这比直接用 HTTPS IP 更适合检查依赖 SNI/Host 的虚拟主机。
+`-k` 会跳过证书校验，只用于排障。
+
+如果不知道目标是什么应用协议，但机器只有 `curl`，且 `curl --version` 的 Protocols 中包含 `telnet`，可将 `telnet://` 作为通用 TCP 建连兜底：
+
+```bash
+curl -v --connect-timeout 3 --max-time 3 telnet://<TARGET_IP>:<PORT> </dev/null
+```
+
+重点只看是否出现 `Connected to`；不要把后续协议输出当作应用健康检查结果。
+
+### 5.3 TLS / HTTPS：openssl
+
+443 或其他 TLS 端口：
+
+```bash
+timeout 5 openssl s_client -connect <TARGET_IP>:<PORT> </dev/null
+```
+
+如果服务依赖 SNI：
+
+```bash
+timeout 5 openssl s_client \
+  -connect <TARGET_IP>:443 \
+  -servername <DOMAIN> \
+  </dev/null
+```
+
+TCP 建连成功但 TLS 握手报错时，说明“端口可达”和“TLS 配置正确”是两个不同问题。
+
+### 5.4 有 Python 3：socket
+
+单端口：
+
+```bash
+python3 -c "import socket; s=socket.create_connection(('<TARGET_IP>', <PORT>), 3); print('OPEN'); s.close()"
+```
+
+多端口：
+
+```bash
+python3 - <<'PY'
+import socket
+
+host = '<TARGET_IP>'
+for port in (443, 8000, 50051):
+    try:
+        with socket.create_connection((host, port), timeout=3):
+            print(f'{port} OPEN')
+    except Exception as e:
+        print(f'{port} FAIL: {e}')
+PY
+```
+
+### 5.5 有 wget：HTTP / HTTPS
+
+```bash
+wget --spider -T 3 http://<TARGET_IP>:<PORT>/
+wget --spider -T 3 https://<TARGET_IP>:<PORT>/
+```
+
+它适合 Web 服务，不适合判断 gRPC、自定义 TCP 等非 HTTP 协议。
+
+### 5.6 有 BusyBox 或 nmap
+
+系统没有独立 `nc`，但存在 BusyBox 时先看是否包含 `nc`：
+
+```bash
+busybox --list | grep '^nc$'
+```
+
+有的话可直接尝试 TCP 建连：
+
+```bash
+timeout 3 busybox nc <TARGET_IP> <PORT> </dev/null \
+  && echo '<PORT> OPEN' \
+  || echo '<PORT> FAIL'
+```
+
+BusyBox 不同版本的 `nc` 参数并不完全一致，需要零 I/O 扫描参数时先执行 `busybox nc --help`，不要直接假设一定支持 `-z`。
+
+已安装 `nmap` 时：
+
+```bash
+nmap -Pn -p 443,8000,50051 <TARGET_IP>
+```
+
+生产环境只扫描明确需要的目标和端口，不做大网段、全端口扫描，避免触发 IDS/审计告警。
+
+### 5.7 如何判断结果
+
+```text
+OPEN / Connected
+→ TCP 三次握手成功，网络路径和监听基本正常；不代表应用一定健康。
+
+Connection refused
+→ 已经到达目标主机/中间设备，但目标端口未监听或被主动拒绝。
+
+Connection timed out
+→ 常见于防火墙丢弃、路由异常、返回路径异常或目标无响应。
+
+No route to host / Network is unreachable
+→ 优先检查本机路由、VPN、网关和接口状态。
+```
+
+`ping` 通不代表 TCP 端口通；`ping` 不通也不代表端口一定不通，因为 ICMP 可能被禁用。
+
+### 5.8 UDP 端口不要用 TCP 结论套用
+
+UDP 没有 TCP 三次握手。Bash `/dev/udp` 即使发送成功，也不能证明远端 UDP 服务一定监听；没有业务层响应时，“无返回”可能代表开放、丢包或被过滤。UDP 排障应结合具体协议客户端、服务端监听和抓包判断。
 
 ## 6. 服务端是否真的监听
 
@@ -244,7 +412,7 @@ traceroute -n <TARGET_IP>
 | 现象 | 首查 | 常见方向 |
 | --- | --- | --- |
 | IP 都 ping 不通 | `ip route get`、`ip neigh`、抓包 | 路由、二层、ICMP 被过滤 |
-| IP 可达，端口超时 | `ss`、`nc`、抓包 | 防火墙丢弃、服务未监听、路径丢包 |
+| IP 可达，端口超时 | `/dev/tcp`、`nc`、抓包 | 防火墙丢弃、服务未监听、路径丢包 |
 | 端口立即 `Connection refused` | 服务端 `ss -lntp` | 对端返回 RST，通常该地址/端口没有接受连接 |
 | DNS 正常但访问失败 | 直接测解析出的 IP/端口 | 与 DNS 无关，继续查传输层/应用 |
 | SYN 发出一直无 SYN-ACK | 两端 tcpdump | 中间丢弃、返回路径错误、防火墙 silent drop |
@@ -285,6 +453,9 @@ tcpdump -ni any host <TARGET_IP>
 
 ## 深入学习
 
+- Bash `/dev/tcp` / Redirections：https://www.gnu.org/software/bash/manual/html_node/Redirections.html
+- curl：https://curl.se/docs/manpage.html
+- OpenSSL `s_client`：https://docs.openssl.org/master/man1/openssl-s_client/
 - Linux `ip` / iproute2：https://man7.org/linux/man-pages/man8/ip.8.html
 - Linux `ss`：https://man7.org/linux/man-pages/man8/ss.8.html
 - TCP 标准 RFC 9293：https://www.rfc-editor.org/rfc/rfc9293
