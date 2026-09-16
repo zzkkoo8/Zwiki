@@ -8,6 +8,7 @@
   * [系统](infrastructure/system/README.md)
     * [Linux 运维开局速查](infrastructure/system/linux-ops-bootstrap.md)
     * [Linux 批量运维速查](infrastructure/system/linux-batch-operations.md)
+    * [tmux 长任务与远程会话速查](infrastructure/system/tmux-operations.md)
     * [Linux 性能故障快速排查](infrastructure/system/linux-performance-troubleshooting.md)
     * [systemd 与日志运维速查](infrastructure/system/linux-systemd-log-operations.md)
     * [Linux 离线软件安装速查](infrastructure/system/linux-offline-package-management.md)
