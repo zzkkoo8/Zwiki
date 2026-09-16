@@ -6,6 +6,7 @@
 
 - [Linux 运维开局速查](linux-ops-bootstrap.md)：接手或排查主机时先确认系统、资源、网络、磁盘和失败服务。
 - [Linux 批量运维速查](linux-batch-operations.md)：SSH、Ansible、密码登录、Python 引导和分批执行。
+- [tmux 长任务与远程会话速查](tmux-operations.md)：SSH 断线保活、会话恢复、窗口/Pane、历史输出、远程接管 Codex 等常见操作。
 - [Linux 性能故障快速排查](linux-performance-troubleshooting.md)：CPU、内存、Load、磁盘 IO 和高占用进程定位。
 - [systemd 与日志运维速查](linux-systemd-log-operations.md)：服务状态、启动失败和日志查看。
 - [Linux 离线软件安装速查](linux-offline-package-management.md)：RPM/DEB、依赖、Python 和 pip 包离线下载与安装。
