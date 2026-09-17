@@ -1,678 +1,472 @@
-# 双网卡 + VPN 指定流量分流（Windows / macOS）
+# 多网卡 + 手机 USB + VPN / 代理分流速查（Windows / macOS / Linux）
 
-用于以下固定场景：电脑同时连接**公司有线网络 + 中国联通手机 USB 共享网络/热点 + 企业 VPN**。
+用于以下常见办公场景：电脑同时存在**有线网卡、手机 USB 共享网络、企业 VPN、代理/TUN**，需要让不同流量稳定走不同出口，并能在手机 USB 拔插、VPN 重连后快速恢复。
 
-本案例有两个不能破坏的前提：
+## 1. 最短结论
 
-1. **VPN 公网端点只能通过联通网络连接。**
-2. **企业内网只能通过 VPN 访问，不能直接从有线网络或手机网络访问。**
-
-当前案例参数：
-
-- **G1：有线网卡**：系统默认出口，普通 Internet 流量继续走这里。
-- **G2：联通手机 USB 网络 / 热点**：只负责访问 VPN 公网端点。
-- **G3：VPN 虚拟网卡**：VPN 建立后承载企业内网流量。
-- **VPN 公网端点**：`42.236.61.166:7444`。
-- **VPN 内网**：`10.7.0.0/16`，目标包括 `10.7.216.249-254`。
-
-> IP 路由按目标 IP/网段选路，不按 TCP/UDP 端口选路。因此实际需要固定的是 `42.236.61.166/32`，而不是单独固定 `:7444`。
-
-## 1. 最终必须形成的链路
+目标链路：
 
 ```text
 普通公网流量
-终端 ──> G1 有线网卡 ──> 有线默认网关 ──> Internet
+终端 -> G1 有线网卡 -> Internet
 
 VPN 建隧道流量
-终端 ──> 42.236.61.166/32 ──> G2 联通手机网络 ──> Internet ──> VPN Server
+终端 -> VPN 公网端点 /32 -> G2 手机 USB 网络 -> Internet -> VPN Server
 
-VPN 建立后的内网流量
-终端 ──> 10.7.0.0/16 ──> G3 VPN 虚拟网卡 ──> VPN 隧道 ──> 10.7.216.249-254
+VPN 建立后的企业内网流量
+终端 -> 企业内网网段 -> G3 VPN 虚拟网卡 -> VPN 隧道
+
+需要代理的公网流量
+应用 -> 代理/TUN -> G1 有线底层出口
 ```
 
-依赖顺序：
+实施时只抓住 4 条：
+
+1. **有线网卡保持默认出口。**
+2. **VPN 公网端点单独配置 `/32` 主机路由，强制走手机 USB。**
+3. **企业内网路由只允许由 VPN 接管，不手工指向有线或手机。**
+4. **全局代理只能有一个 owner，VPN 尽量使用 split-tunnel。**
+
+本机案例参数：
+
+- **G1 有线**：默认 Internet 出口。
+- **G2 手机 USB**：只负责 VPN 公网端点。
+- **G3 VPN**：负责企业内网。
+- **VPN 公网端点示例**：`42.236.61.166:7444`。
+- **企业内网示例**：`10.7.0.0/16`。
+- **TUN 示例**：Mihomo/Clash 类代理。
+
+> 路由只按目标 IP/网段选路，不按 TCP/UDP 端口选路。所以应固定 `42.236.61.166/32`，不是单独固定 `:7444`。
+
+## 2. 为什么 `/32` 能覆盖代理 TUN
+
+路由优先按**最长前缀匹配**：
 
 ```text
-G1 有线继续承担默认路由
-        ↓
-给 42.236.61.166/32 建立 G2 联通手机专用路由
-        ↓
-VPN 客户端才能从联通网络连接 42.236.61.166:7444
-        ↓
-VPN 建立并创建 G3
-        ↓
-VPN 客户端注入 10.7.0.0/16 或更精确的企业内网路由
-        ↓
-10.7.216.249-254 才可达
+42.236.61.166/32
+        >
+0.0.0.0/1、128.0.0.0/1
+        >
+0.0.0.0/0
 ```
 
-**禁止把 `10.7.0.0/16` 手工指向 G1 或 G2。** 企业内网只能进入 VPN 隧道。
+因此即使 Mihomo/TUN 使用 `/1` 分裂默认路由接管公网，VPN Server 的 `/32` 仍会优先命中手机网络。
 
-## 2. 最终验收状态
+不要把 VPN Server 写成 `/24`、`/16` 或默认路由；只写单主机 `/32`。
 
-| 检查对象 | VPN 未连接 | VPN 已连接 | 正确结果 |
-| --- | --- | --- | --- |
-| 默认路由 `0.0.0.0/0` | 存在 | 存在 | G1 有线网卡 |
-| `42.236.61.166/32` | 存在 | 存在 | G2 联通手机网卡 |
-| `10.7.216.249` | 不应通过普通网卡可达 | 应可达 | G3 VPN 虚拟网卡 |
-| 普通 Internet | 可用 | 可用 | 继续走 G1 |
-| VPN Server | 可连接 | 隧道保持 | 始终从 G2 发出 |
+## 3. Windows：推荐实施方案
 
-判断路由时先看**最长前缀**：
+以下操作使用**管理员 PowerShell**。手机 USB 常见为 RNDIS/Remote NDIS 网卡。
 
-```text
-42.236.61.166/32  >  0.0.0.0/0
-10.7.0.0/16       >  0.0.0.0/0
-```
-
-因此默认路由可以保持有线；只要 `42.236.61.166/32` 正确指向联通手机网关，VPN Server 就会绕过默认路由固定走 G2。
-
----
-
-# Windows
-
-修改路由和 Metric 请使用**管理员 PowerShell / 管理员 CMD**。
-
-## 3. Windows：第一步只采集现状，不修改
-
-建议先断开 VPN，仅保留有线和联通手机网络同时在线。这样最容易区分 G1 和 G2。
-
-### 3.1 PowerShell 一次性采集
+### 3.1 先识别当前接口，不硬编码 ifIndex
 
 ```powershell
-$VpnServer = '42.236.61.166'
-$InnerHost = '10.7.216.249'
-
-Write-Host '=== Adapter ==='
 Get-NetAdapter |
     Sort-Object ifIndex |
-    Format-Table ifIndex, Name, InterfaceDescription, Status, LinkSpeed
+    Format-Table ifIndex,Name,InterfaceDescription,Status,MacAddress
 
-Write-Host '=== IP / Gateway ==='
 Get-NetIPConfiguration
-
-Write-Host '=== Interface Metric ==='
-Get-NetIPInterface -AddressFamily IPv4 |
-    Sort-Object InterfaceMetric |
-    Format-Table ifIndex, InterfaceAlias, ConnectionState, AutomaticMetric, InterfaceMetric
-
-Write-Host '=== Default Route ==='
-Get-NetRoute -AddressFamily IPv4 -DestinationPrefix '0.0.0.0/0' |
-    Format-Table InterfaceIndex, InterfaceAlias, NextHop, RouteMetric, InterfaceMetric, PolicyStore
-
-Write-Host '=== VPN Server Route ==='
-Get-NetRoute -AddressFamily IPv4 -DestinationPrefix "$VpnServer/32" -ErrorAction SilentlyContinue |
-    Format-Table DestinationPrefix, InterfaceIndex, InterfaceAlias, NextHop, RouteMetric, PolicyStore
-
-Write-Host '=== Route Decision: VPN Server ==='
-Find-NetRoute -RemoteIPAddress $VpnServer
-Test-NetConnection $VpnServer -DiagnoseRouting -InformationLevel Detailed
-
-Write-Host '=== Route Decision: Inner Host ==='
-Find-NetRoute -RemoteIPAddress $InnerHost -ErrorAction SilentlyContinue
-Test-NetConnection $InnerHost -DiagnoseRouting -InformationLevel Detailed
-
-Write-Host '=== Persistent Routes ==='
-Get-NetRoute -AddressFamily IPv4 -PolicyStore PersistentStore |
-    Sort-Object DestinationPrefix |
-    Format-Table DestinationPrefix, InterfaceIndex, InterfaceAlias, NextHop, RouteMetric
 ```
 
-记录三个信息：
+确认：
 
 ```text
-G1 有线网卡名称 / ifIndex / IPv4 / 默认网关
-G2 联通手机网卡名称 / ifIndex / IPv4 / 默认网关
-42.236.61.166 当前实际选中的出口
+G1 = 当前有线网卡
+G2 = 当前手机 USB/RNDIS 网卡
 ```
 
-### 3.2 CMD 一次性采集
+不要把历史 `ifIndex` 写死到长期脚本；换 USB 口、换手机、重新枚举后索引可能变化。
 
-```cmd
-ipconfig /all
-route print -4
-netsh interface ipv4 show interfaces
-netsh interface ipv4 show route
-route print 42.236.61.166
-route print 10.*
-```
+### 3.2 设置默认出口优先级
 
-### 3.3 修改前预期
-
-修改前常见状态是：
-
-```text
-G1 有线有默认路由
-G2 联通手机也可能有默认路由
-42.236.61.166 没有 /32 专用路由，当前可能错误走 G1
-VPN 未连接时 10.7.216.249 不应通过普通网卡正常访问
-```
-
-如果 `42.236.61.166` 已经正确走 G2，不要重复添加路由；先确认现有规则是否持久化即可。
-
-## 4. Windows：确保默认 Internet 继续走 G1 有线
-
-假设现场识别结果为：
-
-```text
-G1 = Ethernet
-G2 = Ethernet 2
-```
-
-设置接口优先级：
+下面按实际接口名替换：
 
 ```powershell
-Set-NetIPInterface -InterfaceAlias 'Ethernet'   -AddressFamily IPv4 -InterfaceMetric 10
-Set-NetIPInterface -InterfaceAlias 'Ethernet 2' -AddressFamily IPv4 -InterfaceMetric 50
+$WiredAlias  = '以太网 2'
+$MobileAlias = '以太网 4'
+
+$wired  = Get-NetAdapter -Name $WiredAlias
+$mobile = Get-NetAdapter -Name $MobileAlias
+
+Set-NetIPInterface -InterfaceIndex $wired.ifIndex  -AddressFamily IPv4 -AutomaticMetric Disabled -InterfaceMetric 10
+Set-NetIPInterface -InterfaceIndex $mobile.ifIndex -AddressFamily IPv4 -AutomaticMetric Disabled -InterfaceMetric 500
 ```
 
 验证：
 
 ```powershell
+Get-NetIPInterface -InterfaceIndex $wired.ifIndex,$mobile.ifIndex -AddressFamily IPv4 |
+    Format-Table ifIndex,InterfaceAlias,AutomaticMetric,InterfaceMetric
+
 Get-NetRoute -DestinationPrefix '0.0.0.0/0' |
-    Format-Table InterfaceAlias, NextHop, RouteMetric, InterfaceMetric
+    Format-Table InterfaceAlias,NextHop,RouteMetric,InterfaceMetric
 ```
 
-预期：
+预期：有线优先级明显高于手机，普通流量继续走 G1。
 
-```text
-有线 G1 的默认路由有效 Metric 更低
-手机 G2 即使保留默认网关，也不成为普通流量首选出口
-```
-
-CMD 等价操作：
-
-```cmd
-netsh interface ipv4 set interface "Ethernet" metric=10
-netsh interface ipv4 set interface "Ethernet 2" metric=50
-```
-
-> 不要删除 G1 默认路由。G2 也不必强制删除默认网关；只需要让 G1 成为默认优先，再用 `/32` 主机路由覆盖 VPN Server。
-
-## 5. Windows：给 VPN Server 建立 G2 联通专用 `/32` 路由
-
-### 5.1 PowerShell 推荐方式
-
-把 `$MobileAlias` 改成实际联通手机网卡名称：
+### 3.3 动态读取手机网关
 
 ```powershell
-$VpnServer   = '42.236.61.166'
-$MobileAlias = 'Ethernet 2'
-
-$Mobile = Get-NetIPConfiguration -InterfaceAlias $MobileAlias
-$MobileIfIndex = $Mobile.InterfaceIndex
-$MobileGateway = $Mobile.IPv4DefaultGateway.NextHop
-
-$Mobile | Format-List InterfaceAlias, InterfaceIndex, IPv4Address, IPv4DefaultGateway
-
-if (-not $MobileGateway) {
-    throw '没有读取到联通手机网络默认网关，停止修改。'
-}
+$gw = (Get-NetIPConfiguration -InterfaceIndex $mobile.ifIndex).IPv4DefaultGateway.NextHop
+$gw
 ```
 
-检查是否已有同目标路由：
+必须能得到当前手机网关。不要写死历史 DHCP 网关。
+
+### 3.4 重建 VPN Server `/32` 持久路由
 
 ```powershell
+$VpnServer = '42.236.61.166'
+
 Get-NetRoute -DestinationPrefix "$VpnServer/32" -ErrorAction SilentlyContinue |
-    Format-Table DestinationPrefix, InterfaceIndex, InterfaceAlias, NextHop, RouteMetric, PolicyStore
+    Remove-NetRoute -Confirm:$false -ErrorAction SilentlyContinue
+
+Get-NetRoute -DestinationPrefix "$VpnServer/32" -PolicyStore PersistentStore -ErrorAction SilentlyContinue |
+    Remove-NetRoute -PolicyStore PersistentStore -Confirm:$false -ErrorAction SilentlyContinue
+
+route -p add $VpnServer mask 255.255.255.255 $gw metric 1
 ```
 
-如果没有，创建：
+这里优先使用 `route -p` 且**不写 `if <Index>`**，让 Windows 按当前可达手机网关选接口。这样比把接口索引写死更耐受 USB 重插。
 
-```powershell
-New-NetRoute `
-    -DestinationPrefix "$VpnServer/32" `
-    -InterfaceIndex $MobileIfIndex `
-    -NextHop $MobileGateway `
-    -RouteMetric 1
-```
-
-`New-NetRoute` 默认会把路由保存到活动和持久配置；重启后仍应存在。但手机 USB 重插后网关或接口索引可能变化，所以发生故障时必须重新核对。
-
-如果存在**明确错误**的旧 `/32`，先看清楚再删除：
-
-```powershell
-Get-NetRoute -DestinationPrefix "$VpnServer/32" |
-    Format-Table DestinationPrefix, InterfaceIndex, InterfaceAlias, NextHop, RouteMetric, PolicyStore
-```
-
-确认确实错误后：
-
-```powershell
-Remove-NetRoute -DestinationPrefix "$VpnServer/32" -Confirm:$false
-```
-
-然后重新执行 `New-NetRoute`。
-
-### 5.2 CMD 临时验证后再持久化
-
-先查：
-
-```cmd
-route print -4
-netsh interface ipv4 show interfaces
-ipconfig /all
-```
-
-记录：
-
-```text
-<MOBILE_GATEWAY> = 联通手机网关
-<MOBILE_IFINDEX> = 联通手机接口索引
-```
-
-先添加临时路由：
-
-```cmd
-route add 42.236.61.166 mask 255.255.255.255 <MOBILE_GATEWAY> metric 1 if <MOBILE_IFINDEX>
-```
-
-确认 VPN 能正常建立后，改成持久路由：
-
-```cmd
-route delete 42.236.61.166 mask 255.255.255.255
-route /p add 42.236.61.166 mask 255.255.255.255 <MOBILE_GATEWAY> metric 1 if <MOBILE_IFINDEX>
-```
-
-`route /p add` 会把该路由保存为 Windows 持久路由。
-
-## 6. Windows：在拨 VPN 之前先验收 G1 / G2
-
-### 6.1 验证默认出口仍为 G1
-
-```powershell
-Get-NetRoute -DestinationPrefix '0.0.0.0/0' |
-    Format-Table InterfaceAlias, NextHop, RouteMetric, InterfaceMetric
-```
-
-可再测试一个普通公网地址：
+### 3.5 拨 VPN 前验证 G1 / G2
 
 ```powershell
 Find-NetRoute -RemoteIPAddress 1.1.1.1
-```
-
-预期：普通公网地址走 G1 有线。
-
-### 6.2 验证 VPN Server 固定走 G2
-
-```powershell
 Find-NetRoute -RemoteIPAddress 42.236.61.166
-Test-NetConnection 42.236.61.166 -DiagnoseRouting -InformationLevel Detailed
+Get-NetRoute -DestinationPrefix '42.236.61.166/32'
 ```
 
-预期至少满足：
+正确结果：
 
 ```text
-DestinationPrefix = 42.236.61.166/32
-InterfaceAlias    = 联通手机网卡
-NextHop           = 联通手机网关
+1.1.1.1        -> G1 有线
+42.236.61.166  -> G2 手机 USB
 ```
 
-如果 VPN 端点确认为 TCP/7444，可测试：
+如果 VPN Server 屏蔽 ICMP，`ping` 不通不能直接判定链路失败。优先看选路结果、VPN 实际登录结果，以及协议明确时的端口测试。
+
+例如 TCP 7444：
 
 ```powershell
 Test-NetConnection 42.236.61.166 -Port 7444 -InformationLevel Detailed
 ```
 
-如果 VPN 实际使用 UDP 或专有协议，TCP 测试不能代替 VPN 客户端本身。
-
-### 6.3 此时内网不可达是正常现象
-
-VPN 尚未建立时：
+### 3.6 连接 VPN 后验证 G3
 
 ```powershell
+Find-NetRoute -RemoteIPAddress 42.236.61.166
 Find-NetRoute -RemoteIPAddress 10.7.216.249
-Test-NetConnection 10.7.216.249 -DiagnoseRouting -InformationLevel Detailed
-```
-
-不要因为 `10.7.216.249` 不通就给它配置 G1/G2 静态路由。此时内网不可达符合设计。
-
-## 7. Windows：拨入 VPN 后验收 G3
-
-连接 VPN 后执行：
-
-```powershell
-Get-NetAdapter | Sort-Object ifIndex
 
 Get-NetRoute -AddressFamily IPv4 |
     Where-Object {
         $_.DestinationPrefix -like '10.7.*' -or
         $_.DestinationPrefix -eq '42.236.61.166/32'
     } |
-    Format-Table DestinationPrefix, NextHop, InterfaceIndex, InterfaceAlias, RouteMetric
-
-Find-NetRoute -RemoteIPAddress 42.236.61.166
-Find-NetRoute -RemoteIPAddress 10.7.216.249
-Test-NetConnection 10.7.216.249 -DiagnoseRouting -InformationLevel Detailed
+    Format-Table DestinationPrefix,NextHop,InterfaceIndex,InterfaceAlias,RouteMetric
 ```
 
 正确结果：
 
 ```text
-42.236.61.166 → G2 联通手机网卡
-10.7.216.249  → G3 VPN 虚拟网卡
-普通 Internet → G1 有线网卡
+42.236.61.166 -> G2 手机 USB
+10.7.216.249  -> G3 VPN 虚拟网卡
+普通 Internet -> G1 有线/代理 TUN 的底层出口
 ```
 
-如果 VPN 已显示“连接成功”，但 `10.7.216.249` 仍走 G1/G2，则问题在 VPN 内网路由下发，而不是联通 `/32` 路由。
+若 VPN 显示已连接，但 `10.7.216.249` 不走 VPN 虚拟接口，优先检查 VPN 是否下发了 `10.7.0.0/16` 或更精确内网路由。
 
-继续检查：
+### 3.7 手机 USB 拔插后的恢复
 
-```powershell
-Get-NetRoute -AddressFamily IPv4 |
-    Where-Object { $_.DestinationPrefix -like '10.*' } |
-    Sort-Object DestinationPrefix |
-    Format-Table DestinationPrefix, NextHop, InterfaceIndex, InterfaceAlias, RouteMetric
-```
-
-应看到 `10.7.0.0/16`、`10.7.216.0/24` 或更精确的目标路由绑定到 VPN 虚拟接口。
-
-## 8. Windows：重连和重启后的检查点
-
-手机 USB 重新插拔、热点重新连接、VPN 客户端升级、系统重启后，至少执行：
-
-```powershell
-Get-NetIPConfiguration
-Get-NetRoute -DestinationPrefix '42.236.61.166/32' -ErrorAction SilentlyContinue
-Find-NetRoute -RemoteIPAddress 42.236.61.166
-```
-
-同时分别查看 ActiveStore 和 PersistentStore：
-
-```powershell
-Get-NetRoute -AddressFamily IPv4 -PolicyStore ActiveStore |
-    Where-Object { $_.DestinationPrefix -eq '42.236.61.166/32' }
-
-Get-NetRoute -AddressFamily IPv4 -PolicyStore PersistentStore |
-    Where-Object { $_.DestinationPrefix -eq '42.236.61.166/32' }
-```
-
-如果持久路由仍在，但手机网关或接口已变化，应删除旧 `/32` 并按当前 G2 参数重建。
-
----
-
-# macOS
-
-macOS 的目标与 Windows 完全相同：
+重插后只按这个顺序处理：
 
 ```text
-默认流量       → G1 有线
-42.236.61.166  → G2 联通手机网络
-10.7.0.0/16    → VPN 建立后的 G3 / utunX
+1. 重新识别手机接口
+2. 重新读取手机 DHCP 网关
+3. 再次设置 G1/G2 Metric
+4. 删除旧 VPN Server /32
+5. 用新手机网关重建 /32
+6. 先验证 G1/G2
+7. 再连接 VPN
+8. 验证 G3
 ```
 
-## 9. macOS：第一步只采集现状，不修改
+最常见变化：
 
-建议先断开 VPN，再执行：
+- `ifIndex` 变化；
+- 手机 DHCP 网关变化；
+- 新枚举网卡恢复自动 Metric；
+- 旧 `/32` 仍指向旧网关。
 
-```bash
-networksetup -listnetworkserviceorder
-networksetup -listallhardwareports
-ifconfig
-netstat -rn -f inet
-route -n get default
-route -n get 42.236.61.166
-route -n get 10.7.216.249
-scutil --nwi
+## 4. Windows CMD 快速操作
+
+先查询：
+
+```cmd
+ipconfig /all
+netsh interface ipv4 show interfaces
+route print -4
 ```
 
-重点记录：
+设置接口优先级：
 
-```text
-G1 有线 Network Service 名称、BSD Device、IP、网关
-G2 联通手机 Network Service 名称、BSD Device、IP、网关
-当前 default 的 interface / gateway
-42.236.61.166 当前的 interface / gateway
+```cmd
+netsh interface ipv4 set interface "以太网 2" metric=10
+netsh interface ipv4 set interface "以太网 4" metric=500
 ```
 
-不要假设 `en0`、`en5`、`en7` 分别是什么，必须根据本机输出识别。
-
-## 10. macOS：确保默认出口为 G1 有线
-
-查看服务顺序：
-
-```bash
-networksetup -listnetworkserviceorder
-```
-
-如果有线服务排在联通手机网络之后，可调整 Network Service Order。命令要求写出当前机器的完整服务列表，例如：
-
-```bash
-sudo networksetup -ordernetworkservices \
-    "<WIRED_SERVICE>" \
-    "<MOBILE_SERVICE>" \
-    "Wi-Fi" \
-    "<OTHER_SERVICE>"
-```
-
-不要直接照抄示例漏掉已有服务。
-
-验证：
-
-```bash
-route -n get default
-```
-
-预期：
-
-```text
-interface: <WIRED_IF>
-gateway:   <WIRED_GATEWAY>
-```
-
-## 11. macOS：确定 G2 联通手机接口和网关
-
-映射 Network Service 与 BSD Device：
-
-```bash
-networksetup -listnetworkserviceorder
-networksetup -listallhardwareports
-```
-
-假设已经识别：
-
-```text
-<MOBILE_SERVICE> = 联通手机对应的网络服务名
-<MOBILE_IF>      = 对应 BSD Device，例如 en7
-```
-
-读取 DHCP 网关：
-
-```bash
-ipconfig getoption <MOBILE_IF> router
-```
-
-也可查看服务信息：
-
-```bash
-networksetup -getinfo "<MOBILE_SERVICE>"
-```
-
-必须得到：
-
-```text
-<MOBILE_GATEWAY>
-<MOBILE_IF>
-<MOBILE_SERVICE>
-```
-
-## 12. macOS：先用临时 `/32` 路由验证 G2
-
-添加：
-
-```bash
-sudo route -n add -host 42.236.61.166 <MOBILE_GATEWAY>
-```
-
-如果提示已存在，先检查：
-
-```bash
-route -n get 42.236.61.166
-```
-
-确认旧规则错误后再删除并重建：
-
-```bash
-sudo route -n delete -host 42.236.61.166
-sudo route -n add -host 42.236.61.166 <MOBILE_GATEWAY>
-```
-
-验证：
-
-```bash
-route -n get 42.236.61.166
-```
-
-正确结果：
-
-```text
-gateway:   <MOBILE_GATEWAY>
-interface: <MOBILE_IF>
-```
-
-此时再启动 VPN 客户端。如果 VPN 可以正常连接，说明 G2 路径成立。
-
-## 13. macOS：把 `/32` 持久化到 G2 Network Service
-
-先检查该网络服务已有 additional routes：
-
-```bash
-networksetup -getadditionalroutes "<MOBILE_SERVICE>"
-```
-
-**`-setadditionalroutes` 会设置该服务的完整 additional route 列表。** 如果已有其他静态路由，必须一起保留，不能只写新路由覆盖旧配置。
-
-如果当前没有其他 additional routes，可执行：
-
-```bash
-sudo networksetup -setadditionalroutes \
-    "<MOBILE_SERVICE>" \
-    42.236.61.166 255.255.255.255 <MOBILE_GATEWAY>
-```
-
-验证：
-
-```bash
-networksetup -getadditionalroutes "<MOBILE_SERVICE>"
-route -n get 42.236.61.166
-```
-
-## 14. macOS：拨 VPN 前验收
-
-```bash
-route -n get default
-route -n get 42.236.61.166
-route -n get 10.7.216.249
-```
-
-预期：
-
-```text
-default         → G1 有线
-42.236.61.166   → G2 联通手机
-10.7.216.249    → VPN 未连时不应存在可用的企业内网隧道路由
-```
-
-不要为了让 `10.7.216.249` 暂时可达而给 G1/G2 添加 `10.7.0.0/16` 路由。
-
-## 15. macOS：拨 VPN 后验收 G3
-
-连接 VPN 后执行：
-
-```bash
-route -n get default
-route -n get 42.236.61.166
-route -n get 10.7.216.249
-netstat -rn -f inet | egrep 'default|42\.236\.61\.166|10\.7\.'
-scutil --nwi
-```
-
-正确结果：
-
-```text
-default         → G1 有线 BSD Device
-42.236.61.166   → G2 联通手机 BSD Device
-10.7.216.249    → utun0 / utun1 / VPN 客户端虚拟接口
-```
-
-如果 VPN 显示已连接，但 `10.7.216.249` 不走 `utunX` 或 VPN 虚拟接口，则优先检查 VPN 客户端是否下发企业内网路由。
-
-## 16. macOS：手机重连后的检查点
-
-手机热点、USB 共享网络重新连接后，DHCP 网关可能变化。执行：
-
-```bash
-ipconfig getoption <MOBILE_IF> router
-networksetup -getadditionalroutes "<MOBILE_SERVICE>"
-route -n get 42.236.61.166
-```
-
-如果 additional route 中仍引用旧手机网关，应重新写入正确网关。
-
----
-
-# 统一故障判断
-
-## 17. 最短排错流程
-
-严格按顺序检查，不要跳过 G2 直接修 G3：
-
-```text
-1. G1 有线是否仍是默认出口？
-        ↓ 是
-2. 42.236.61.166 是否命中 /32？
-        ↓ 是
-3. /32 的下一跳和接口是否属于联通手机 G2？
-        ↓ 是
-4. VPN 客户端是否能建立隧道？
-        ↓ 是
-5. VPN 是否创建 G3 / utunX？
-        ↓ 是
-6. 是否出现 10.7.0.0/16 或更精确 VPN 路由？
-        ↓ 是
-7. 10.7.216.249 是否命中 G3？
-```
-
-## 18. 现象与根因
-
-| 现象 | 首查 | 常见根因 |
-| --- | --- | --- |
-| 普通上网跑到手机流量 | 默认路由 / Metric / Service Order | G2 优先级高于 G1 |
-| VPN 完全连不上 | `42.236.61.166/32` | VPN Server 错走有线 |
-| VPN 端点走手机但仍连不上 | 7444/客户端日志/联通网络 | 端口、协议、VPN 服务端或运营商链路 |
-| VPN 已连接但 `10.7.x.x` 不通 | `10.7.*` 路由 | VPN 未下发 split-tunnel 路由 |
-| `10.7.x.x` 走手机网关 | 路由表 | 错误手工配置了 G2 内网路由 |
-| 手机重插后 VPN 突然失效 | G2 网关、ifIndex/BSD Device | DHCP/接口参数变化，旧持久路由失效 |
-| 重启后 Windows 路由行为不同 | ActiveStore / PersistentStore | 持久路由与当前接口参数不一致 |
-
-## 19. 不应该做的操作
-
-以下操作很容易把链路修坏：
-
-```text
-× 把 10.7.0.0/16 指向手机网关
-× 把 10.7.0.0/16 指向有线网关
-× 为了 VPN 删除有线默认路由
-× 把整机默认路由永久切到手机热点
-× 在不确认接口的情况下照抄 ifIndex / enX
-× 看到 VPN 已连接就认为内网路由一定正确
-× 手机网关变化后继续沿用旧 /32 持久路由
-```
-
-## 20. 恢复本次配置
-
-### Windows
-
-删除 VPN Server 专用 `/32`：
-
-```powershell
-Remove-NetRoute -DestinationPrefix '42.236.61.166/32' -Confirm:$false
-```
-
-或：
+假设当前手机网关为 `10.54.23.41`：
 
 ```cmd
 route delete 42.236.61.166 mask 255.255.255.255
+route -p add 42.236.61.166 mask 255.255.255.255 10.54.23.41 metric 1
+route print 42.236.61.166
+```
+
+原则仍然是：**手机网关运行时查询，不长期写死；尽量不要把 ifIndex 写进持久路由。**
+
+## 5. macOS 快速实施
+
+macOS 使用**网络服务名**做长期配置，不要长期依赖 `enX`。
+
+### 5.1 识别服务和当前网关
+
+```bash
+networksetup -listallnetworkservices
+networksetup -listnetworkserviceorder
+networksetup -listallhardwareports
+networksetup -getinfo "<MOBILE_SERVICE>"
+```
+
+如果已经知道手机对应 BSD Device，也可读取 DHCP 网关：
+
+```bash
+ipconfig getoption <MOBILE_IF> router
+```
+
+### 5.2 默认出口保持有线优先
+
+```bash
+sudo networksetup -ordernetworkservices \
+  "<WIRED_SERVICE>" \
+  "<MOBILE_SERVICE>" \
+  "Wi-Fi"
+```
+
+执行前先看完整服务列表；不要漏掉本机仍需保留的其他 Network Service。
+
+验证：
+
+```bash
+route -n get default
+```
+
+### 5.3 给 VPN Server 添加持久 `/32`
+
+先检查已有附加路由：
+
+```bash
+networksetup -getadditionalroutes "<MOBILE_SERVICE>"
+```
+
+如果没有其他必须保留的 additional routes：
+
+```bash
+sudo networksetup -setadditionalroutes \
+  "<MOBILE_SERVICE>" \
+  42.236.61.166 255.255.255.255 <MOBILE_GATEWAY>
+```
+
+验证：
+
+```bash
+networksetup -getadditionalroutes "<MOBILE_SERVICE>"
+route -n get 42.236.61.166
+```
+
+> `-setadditionalroutes` 会重设该服务的附加路由列表。若原来已有其他静态路由，必须一起保留。
+
+### 5.4 VPN 前后验证
+
+VPN 前：
+
+```bash
+route -n get default
+route -n get 42.236.61.166
+```
+
+VPN 后：
+
+```bash
+route -n get 10.7.216.249
+netstat -rn -f inet | egrep 'default|42\.236\.61\.166|10\.7\.'
+```
+
+预期：
+
+```text
+default        -> G1 有线
+42.236.61.166  -> G2 手机网络
+10.7.216.249   -> utunX / VPN 虚拟接口
+```
+
+## 6. Linux（NetworkManager）快速实施
+
+适用于 Ubuntu/Fedora 等由 NetworkManager 管理的桌面 Linux。
+
+### 6.1 识别当前连接
+
+```bash
+ip -br addr
+nmcli device status
+nmcli connection show --active
+```
+
+记录：
+
+```text
+<WIRED_CONN>
+<PHONE_CONN>
+<PHONE_IF>
+```
+
+读取手机网关：
+
+```bash
+nmcli -t -f IP4.GATEWAY device show <PHONE_IF>
+```
+
+### 6.2 默认出口保持有线，手机只做专用出口
+
+```bash
+sudo nmcli connection modify <WIRED_CONN> ipv4.route-metric 10
+sudo nmcli connection modify <PHONE_CONN> ipv4.never-default yes ipv4.route-metric 500
+```
+
+### 6.3 添加 VPN Server `/32`
+
+```bash
+sudo nmcli connection modify <PHONE_CONN> +ipv4.routes "42.236.61.166/32 <PHONE_GW> 1"
+sudo nmcli connection up <PHONE_CONN>
+```
+
+验证：
+
+```bash
+ip route get 42.236.61.166
+ip route get 10.7.216.249
+```
+
+手机重插后若 NetworkManager 新建了连接，必须把 Metric、`never-default` 和 `/32` 重新应用到**当前连接**。
+
+## 7. 代理 / TUN / VPN 共存规则
+
+多代理场景最重要的是避免“多个软件同时抢默认路由”。
+
+### 规则
+
+1. **全局代理只能有一个。** Mihomo/Clash/OpenVPN/其他 TUN 中，只允许一个软件接管全部公网。
+2. **企业 VPN 优先 split-tunnel。** 只注入企业内网前缀，不抢 `0.0.0.0/0`。
+3. **VPN Server 永远用 `/32`。** 它会优先于 `/1`、`/0`。
+4. **有线 Metric 低，手机 Metric 高。** 没有代理时，OS 默认仍走有线。
+5. **启动顺序建议：** 物理网络 -> 全局代理 -> 检查 `/32` -> 企业 VPN。
+6. 新开第二个“全局模式”VPN/代理前，先关闭原全局代理或把其中一个改成 split-tunnel。
+
+### Windows 快速检查是否打架
+
+```powershell
+Get-NetRoute -AddressFamily IPv4 |
+    Where-Object {
+        $_.DestinationPrefix -in @('0.0.0.0/0','0.0.0.0/1','128.0.0.0/1')
+    } |
+    Sort-Object DestinationPrefix,RouteMetric |
+    Format-Table DestinationPrefix,InterfaceAlias,NextHop,RouteMetric
+```
+
+判断：
+
+```text
+正常：全局 /1 或等价全局路由只归一个 TUN/代理
+异常：多个 VPN/TUN 同时注入全局路由，且互相覆盖
+```
+
+## 8. 手机 USB 的两个现场坑
+
+### 8.1 老旧 USB Wi-Fi 网卡可能出现 IPv6 有、IPv4 无
+
+实测曾出现：
+
+```text
+Wi-Fi 已关联手机热点
+IPv6 正常
+IPv4 DHCP 失败
+最终只有 169.254.x.x APIPA
+```
+
+这说明“IPv6 能通”不能证明 IPv4 正常。VPN 公网端点如果是 IPv4，仍需要正常 DHCPv4。
+
+现场优先方案仍是：**手机 USB RNDIS 直连**。
+
+### 8.2 Windows 通常无法覆盖 RNDIS 的手机侧 MAC
+
+部分 VPN 会把认证绑定到网卡 MAC。实测对 RNDIS 执行：
+
+```powershell
+Set-NetAdapterAdvancedProperty -Name '<PHONE_ALIAS>' -RegistryKeyword NetworkAddress -RegistryValue '0A1B2C3D4E5F'
+```
+
+即使注册表写入成功，实际 MAC 仍可能保持手机下发值。
+
+原因是 RNDIS MAC 往往由手机侧 USB/RNDIS 描述提供，Windows 驱动不一定支持覆盖。
+
+因此：
+
+```text
+优先：手机侧选择“固定/设备 MAC”（若手机支持）
+其次：VPN 改为账号/证书等不依赖 MAC 的认证方式
+不要：反复尝试 Windows NetworkAddress 强改 RNDIS MAC
+```
+
+## 9. 最短故障判断
+
+严格按以下顺序，不要跳过 G2 直接修 VPN 内网：
+
+```text
+1. G1 有线是不是默认出口？
+        ↓
+2. VPN Server 有没有命中 /32？
+        ↓
+3. /32 下一跳是不是当前手机网关？
+        ↓
+4. VPN 能不能建立？
+        ↓
+5. VPN 是否创建虚拟接口？
+        ↓
+6. VPN 是否下发企业内网路由？
+        ↓
+7. 企业内网目标是否命中 VPN 接口？
+```
+
+常见现象：
+
+| 现象 | 首查 | 常见原因 |
+| --- | --- | --- |
+| 普通上网跑到手机 | 默认路由、Metric | 手机优先级过高 |
+| VPN 完全连不上 | VPN Server `/32` | VPN Server 错走有线/代理 |
+| 手机重插后 VPN 失效 | 手机网关、ifIndex、持久路由 | DHCP/接口重新枚举 |
+| VPN 已连接但内网不通 | `10.x` 路由 | VPN 未下发 split-tunnel 路由 |
+| 内网错误走手机 | 路由表 | 手工把企业内网指向 G2 |
+| 多个代理时网络抖动 | `/0`、`/1` | 多个 TUN 同时抢全局路由 |
+| VPN Server ping 不通 | 实际选路、VPN 登录 | 服务端屏蔽 ICMP |
+
+## 10. 回退
+
+### Windows
+
+删除专用 `/32`：
+
+```powershell
+Remove-NetRoute -DestinationPrefix '42.236.61.166/32' -Confirm:$false
 ```
 
 恢复自动 Metric：
@@ -684,50 +478,51 @@ Set-NetIPInterface -InterfaceAlias '<MOBILE_ALIAS>' -AddressFamily IPv4 -Automat
 
 ### macOS
 
-删除临时 host route：
-
-```bash
-sudo route -n delete -host 42.236.61.166
-```
-
-如需清除该 Network Service 的 additional routes：
+先确认该服务没有其他必须保留的 additional routes，再清空：
 
 ```bash
 networksetup -getadditionalroutes "<MOBILE_SERVICE>"
-```
-
-确认该服务没有其他必须保留的 additional routes 后才执行：
-
-```bash
 sudo networksetup -setadditionalroutes "<MOBILE_SERVICE>"
 ```
 
----
+### Linux
 
-# 现场最终检查清单
+查看当前连接配置：
 
-完成配置后逐项确认：
+```bash
+nmcli connection show <PHONE_CONN>
+```
+
+按现场需要删除对应 `ipv4.routes`，并恢复原 `ipv4.never-default` / `ipv4.route-metric`。
+
+## 11. 风险边界
+
+- 不硬编码历史 `ifIndex`、`enX`、`usbX`。
+- 不把企业内网路由手工指向手机或有线。
+- 不为了 VPN 删除有线默认路由。
+- 不在多个代理/VPN 中同时开启全局模式。
+- 不把 VPN Server `/32` 扩大成网段。
+- 远程生产主机没有带外管理时，不直接修改默认路由和网卡 Metric。
+- 修改前先记录当前路由；修改后立即验证 G1/G2，再连接 VPN 验证 G3。
+
+## 12. 现场验收清单
 
 ```text
-□ G1 有线是普通 Internet 默认出口
-□ G2 明确是中国联通手机 USB/热点网络
-□ 42.236.61.166/32 明确绑定 G2 的网关/接口
-□ VPN 未连接时 10.7.216.249 不通过 G1/G2 直接访问
-□ VPN 可以通过 G2 建立
-□ VPN 建立后出现 G3 / utunX
-□ 10.7.0.0/16 或更精确内网路由绑定 G3
-□ 10.7.216.249 实际选路为 G3
-□ VPN 连接期间 42.236.61.166 仍走 G2，而不是被 G3 抢走
-□ 普通 Internet 在 VPN 连接期间仍按设计走 G1
-□ Windows 重启 / 手机重插后重新验证 ActiveStore、PersistentStore、手机网关
-□ macOS 手机重连后重新验证 additional route 和当前手机网关
+□ 普通 Internet 默认走 G1 有线
+□ VPN Server /32 走 G2 手机 USB
+□ 手机 USB 当前网关与 /32 下一跳一致
+□ VPN 建立后企业内网走 G3 VPN 虚拟接口
+□ VPN Server 在 VPN 连接期间仍走 G2
+□ 全局代理/TUN 只有一个 owner
+□ 手机拔插后重新检查接口、网关和 /32
+□ VPN 端点若不响应 ICMP，不使用 ping 作为唯一判断依据
 ```
 
 ## 官方参考
 
-- Microsoft `route`：https://learn.microsoft.com/windows-server/administration/windows-commands/route_ws2008
-- Microsoft `New-NetRoute`：https://learn.microsoft.com/powershell/module/nettcpip/new-netroute
-- Microsoft `Get-NetRoute`：https://learn.microsoft.com/powershell/module/nettcpip/get-netroute
-- Microsoft `Set-NetIPInterface`：https://learn.microsoft.com/powershell/module/nettcpip/set-netipinterface
-- Microsoft `Test-NetConnection`：https://learn.microsoft.com/powershell/module/nettcpip/test-netconnection
-- macOS 本机帮助：`man route`、`man networksetup`、`networksetup -help`
+- Microsoft `route`：<https://learn.microsoft.com/windows-server/administration/windows-commands/route_ws2008>
+- Microsoft `Get-NetRoute`：<https://learn.microsoft.com/powershell/module/nettcpip/get-netroute>
+- Microsoft `Set-NetIPInterface`：<https://learn.microsoft.com/powershell/module/nettcpip/set-netipinterface>
+- Microsoft `Test-NetConnection`：<https://learn.microsoft.com/powershell/module/nettcpip/test-netconnection>
+- NetworkManager `nm-settings-nmcli`：<https://networkmanager.dev/docs/api/latest/nm-settings-nmcli.html>
+- macOS：本机执行 `man route`、`man networksetup`、`networksetup -help`
