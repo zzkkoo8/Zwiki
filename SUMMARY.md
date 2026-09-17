@@ -29,6 +29,7 @@
     * [Docker 日常运维速查](cloud-native/docker/docker-operations.md)
     * [Docker 故障排查速查](cloud-native/docker/docker-troubleshooting.md)
   * [Kubernetes](cloud-native/kubernetes/README.md)
+    * [Kubernetes / K3s 核心组件关系速查](cloud-native/kubernetes/kubernetes-core-concepts.md)
     * [kubectl 日常运维速查](cloud-native/kubernetes/kubectl-operations.md)
     * [Kubernetes 故障排查速查](cloud-native/kubernetes/kubernetes-troubleshooting.md)
     * [Helm 日常运维速查](cloud-native/kubernetes/helm-operations.md)
