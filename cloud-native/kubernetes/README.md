@@ -4,6 +4,7 @@
 
 ## 常用速查
 
+* [Kubernetes / K3s 核心组件关系速查](kubernetes-core-concepts.md)：先看懂 Node、Pod、Container、Deployment、DaemonSet、Service、Ingress、存储和常用工具之间的关系。
 * [kubectl 日常运维速查](kubectl-operations.md)：资源查看、日志、exec、事件、Service/EndpointSlice、rollout 和 scale。
 * [Kubernetes 故障排查速查](kubernetes-troubleshooting.md)：Node → Pod → Container → Service → EndpointSlice → Ingress → 应用逐层定位。
 * [Helm 日常运维速查](helm-operations.md)：Release、values、history、upgrade、rollback 和升级验证。
