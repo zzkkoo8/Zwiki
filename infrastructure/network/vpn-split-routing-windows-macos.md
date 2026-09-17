@@ -7,7 +7,7 @@
 目标链路：
 
 ```text
-普通公网流量
+普通公网流量（未启用代理 TUN）
 终端 -> G1 有线网卡 -> Internet
 
 VPN 建隧道流量
@@ -22,14 +22,14 @@ VPN 建立后的企业内网流量
 
 实施时只抓住 4 条：
 
-1. **有线网卡保持默认出口。**
+1. **有线网卡保持物理默认出口。**
 2. **VPN 公网端点单独配置 `/32` 主机路由，强制走手机 USB。**
 3. **企业内网路由只允许由 VPN 接管，不手工指向有线或手机。**
 4. **全局代理只能有一个 owner，VPN 尽量使用 split-tunnel。**
 
 本机案例参数：
 
-- **G1 有线**：默认 Internet 出口。
+- **G1 有线**：物理默认 Internet 出口。
 - **G2 手机 USB**：只负责 VPN 公网端点。
 - **G3 VPN**：负责企业内网。
 - **VPN 公网端点示例**：`42.236.61.166:7444`。
@@ -77,7 +77,7 @@ G2 = 当前手机 USB/RNDIS 网卡
 
 不要把历史 `ifIndex` 写死到长期脚本；换 USB 口、换手机、重新枚举后索引可能变化。
 
-### 3.2 设置默认出口优先级
+### 3.2 设置物理默认出口优先级
 
 下面按实际接口名替换：
 
@@ -92,7 +92,7 @@ Set-NetIPInterface -InterfaceIndex $wired.ifIndex  -AddressFamily IPv4 -Automati
 Set-NetIPInterface -InterfaceIndex $mobile.ifIndex -AddressFamily IPv4 -AutomaticMetric Disabled -InterfaceMetric 500
 ```
 
-验证：
+验证物理默认路由：
 
 ```powershell
 Get-NetIPInterface -InterfaceIndex $wired.ifIndex,$mobile.ifIndex -AddressFamily IPv4 |
@@ -102,7 +102,7 @@ Get-NetRoute -DestinationPrefix '0.0.0.0/0' |
     Format-Table InterfaceAlias,NextHop,RouteMetric,InterfaceMetric
 ```
 
-预期：有线优先级明显高于手机，普通流量继续走 G1。
+预期：物理 `0.0.0.0/0` 中有线优先级明显高于手机。代理 TUN 开启后可以再用 `/1` 等更长前缀接管公网，但底层物理默认出口仍保持 G1。
 
 ### 3.3 动态读取手机网关
 
@@ -131,8 +131,12 @@ route -p add $VpnServer mask 255.255.255.255 $gw metric 1
 
 ### 3.5 拨 VPN 前验证 G1 / G2
 
+先确认物理默认路由和 VPN Server 专用路由：
+
 ```powershell
-Find-NetRoute -RemoteIPAddress 1.1.1.1
+Get-NetRoute -DestinationPrefix '0.0.0.0/0' |
+    Format-Table InterfaceAlias,NextHop,RouteMetric,InterfaceMetric
+
 Find-NetRoute -RemoteIPAddress 42.236.61.166
 Get-NetRoute -DestinationPrefix '42.236.61.166/32'
 ```
@@ -140,8 +144,24 @@ Get-NetRoute -DestinationPrefix '42.236.61.166/32'
 正确结果：
 
 ```text
-1.1.1.1        -> G1 有线
-42.236.61.166  -> G2 手机 USB
+物理 0.0.0.0/0  -> G1 有线优先
+42.236.61.166/32 -> G2 手机 USB
+```
+
+如果代理 TUN **未开启**，可再执行：
+
+```powershell
+Find-NetRoute -RemoteIPAddress 1.1.1.1
+```
+
+此时普通公网应直接走 G1。
+
+如果代理 TUN **已开启**，`1.1.1.1` 正常可能命中 TUN，而不是直接显示 G1；这不代表路由错误。此时应确认：
+
+```text
+公网应用流量 -> TUN
+TUN 的物理底层出口 -> G1
+VPN Server /32 -> G2
 ```
 
 如果 VPN Server 屏蔽 ICMP，`ping` 不通不能直接判定链路失败。优先看选路结果、VPN 实际登录结果，以及协议明确时的端口测试。
@@ -171,7 +191,7 @@ Get-NetRoute -AddressFamily IPv4 |
 ```text
 42.236.61.166 -> G2 手机 USB
 10.7.216.249  -> G3 VPN 虚拟网卡
-普通 Internet -> G1 有线/代理 TUN 的底层出口
+普通 Internet -> 无 TUN 时直接 G1；有 TUN 时由代理接管且底层仍为 G1
 ```
 
 若 VPN 显示已连接，但 `10.7.216.249` 不走 VPN 虚拟接口，优先检查 VPN 是否下发了 `10.7.0.0/16` 或更精确内网路由。
@@ -357,7 +377,7 @@ ip route get 42.236.61.166
 ip route get 10.7.216.249
 ```
 
-手机重插后若 NetworkManager 新建了连接，必须把 Metric、`never-default` 和 `/32` 重新应用到**当前连接**。
+手机重插后若 NetworkManager 新建了连接，必须把 Metric、`never-default` 和 `/32` 重新应用到**当前连接**。若手机网关变化，还应先清理旧的同目标静态路由，避免 `+ipv4.routes` 累积旧条目。
 
 ## 7. 代理 / TUN / VPN 共存规则
 
@@ -432,7 +452,7 @@ Set-NetAdapterAdvancedProperty -Name '<PHONE_ALIAS>' -RegistryKeyword NetworkAdd
 严格按以下顺序，不要跳过 G2 直接修 VPN 内网：
 
 ```text
-1. G1 有线是不是默认出口？
+1. G1 有线是不是物理默认出口？
         ↓
 2. VPN Server 有没有命中 /32？
         ↓
@@ -451,7 +471,7 @@ Set-NetAdapterAdvancedProperty -Name '<PHONE_ALIAS>' -RegistryKeyword NetworkAdd
 
 | 现象 | 首查 | 常见原因 |
 | --- | --- | --- |
-| 普通上网跑到手机 | 默认路由、Metric | 手机优先级过高 |
+| 普通上网直接跑到手机 | 物理默认路由、Metric | 手机优先级过高 |
 | VPN 完全连不上 | VPN Server `/32` | VPN Server 错走有线/代理 |
 | 手机重插后 VPN 失效 | 手机网关、ifIndex、持久路由 | DHCP/接口重新枚举 |
 | VPN 已连接但内网不通 | `10.x` 路由 | VPN 未下发 split-tunnel 路由 |
@@ -508,7 +528,8 @@ nmcli connection show <PHONE_CONN>
 ## 12. 现场验收清单
 
 ```text
-□ 普通 Internet 默认走 G1 有线
+□ 物理默认路由中 G1 有线优先于 G2 手机
+□ 无 TUN 时普通 Internet 直接走 G1；有 TUN 时代理接管公网但底层物理出口仍为 G1
 □ VPN Server /32 走 G2 手机 USB
 □ 手机 USB 当前网关与 /32 下一跳一致
 □ VPN 建立后企业内网走 G3 VPN 虚拟接口
