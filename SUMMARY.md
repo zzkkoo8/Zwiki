@@ -52,6 +52,7 @@
     * [Vibe Coding](ai/coding/vibe-coding.md)
     * [Codex 项目开局速查](ai/coding/codex-project-bootstrap.md)
     * [Jev 决策模型与 Agent 门控最佳实践](ai/coding/jev-agent-decision-model.md)
+    * [Agent Harness 开发速查](ai/coding/agent-harness-development.md)
   * [Skills 与插件](ai/skills-plugins.md)
   * [模型与接入](ai/model-access.md)
   * [提示词](ai/prompting.md)

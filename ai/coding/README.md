@@ -10,6 +10,7 @@ AI Coding 只保留 Coding Agent 在实际开发中的常用流程、配置和�
 - [Vibe Coding](vibe-coding.md)：Coding Agent 的分阶段实现、验证和 Git 回退流程。
 - [Codex 项目开局速查](codex-project-bootstrap.md)：新项目最小目录、README、AGENTS.md、验收命令和 Spec 使用边界。
 - [Jev 决策模型与 Agent 门控最佳实践](jev-agent-decision-model.md)：Tool 路由、风险判断、置信度门控、影子测试和 Harness 接入模式。
+- [Agent Harness 开发速查](agent-harness-development.md)：主流 Harness 案例、最小实现、权限、沙箱、状态恢复和生产化路径。
 
 ## 常用 Coding Agent
 
