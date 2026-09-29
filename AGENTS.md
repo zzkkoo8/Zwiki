@@ -13,6 +13,7 @@
 9. 脚本、配置、图片等附件应存入 GitHub，并在 Markdown 中使用相对路径引用。
 10. 禁止提交密码、Token、Cookie、私钥、客户信息及其他敏感数据。
 11. “文档信息”等少量键值元数据统一使用加粗键值列表，不使用 Markdown 两列表格；只有方案对比、兼容矩阵、参数清单等确有横向比较价值时才使用表格。
+12. 每篇正文文章末尾必须包含“参考资料”章节，列出支持本文关键事实和方法的一手来源；优先官方文档、官方仓库、标准或原始项目资料，不得只写“来源：网络”。
 
 ## 内容定位
 
@@ -31,7 +32,7 @@ Zwiki 是**常见运维、产品部署和技术场景的快速实施方案库**�
         ↓
 必要风险和回退
         ↓
-官方资料链接
+参考资料
 ```
 
 具体要求：
@@ -52,6 +53,7 @@ Zwiki 是**常见运维、产品部署和技术场景的快速实施方案库**�
 - `cloud-native/`：容器与云原生，包括 Docker、Kubernetes、K3s。
 - `development/platforms/`：工程平台，包括 GitHub、GitBook、GitLab、Vercel、CI/CD 等开发协作与发布平台。
 - `development/tooling/`：技术栈与工具，包括前端、后端、全栈、设计和测试工具。
+- `ai/agent-engineering/`：通用 Agent 工程化，包括 Harness、Context/State、Memory/Knowledge、Tool/MCP/Skill、Runtime/Sandbox、多 Agent、治理、评估和运维 Agent。
 - `ai/coding/`：AI Coding，包括 Vibe Coding、Codex、Claude Code、Cursor、多 Agent 协作、上下文管理和 AI 代码审查。
 - `ai/`：其他 AI 专属内容，包括模型接入、API Key / Token 获取与安全配置、Skills、插件、MCP、提示词和 AI 资源。
 - `projects/`：项目阅读页或外部项目自动镜像。
@@ -117,7 +119,8 @@ AI 自动审核至少检查：
 7. 是否存在密码、Token、Cookie、私钥、客户信息等敏感内容。
 8. 是否发生未经用户要求的删除、移动、重命名或大范围重构。
 9. 文档信息是否按规范使用键值列表，是否存在仅为元数据展示而创建的无意义小表格。
-10. 最终 diff 是否保持完成当前任务所需的最小变更。
+10. 新增或实质修改的正文是否在末尾保留“参考资料”，并且来源能支持关键事实和方法。
+11. 最终 diff 是否保持完成当前任务所需的最小变更。
 
 默认不等待人工批准 PR。只有出现以下情况时才停止自动合并并向用户确认：
 
