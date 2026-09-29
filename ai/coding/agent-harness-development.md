@@ -435,7 +435,16 @@ agent/
 □ 有真实任务回归集，不只靠人工体验
 ```
 
-## 官方资料
+## 参考资料
+
+### 企业 Agent 工程方法
+
+- 阿里云 AI Agent HandBook：<https://github.com/aliyun/ai-agent-handbook>
+- Harness 的主流构建方式和责任边界：<https://github.com/aliyun/ai-agent-handbook/blob/main/02-build/%E7%AC%AC%203%20%E7%AB%A0%20%E8%8C%83%E5%BC%8F%EF%BC%9AHarness%20%E7%9A%84%E4%B8%BB%E6%B5%81%E6%9E%84%E5%BB%BA%E6%96%B9%E5%BC%8F%E5%92%8C%E8%B4%A3%E4%BB%BB%E8%BE%B9%E7%95%8C.md>
+- 任务：编排、长程推进与协作流转：<https://github.com/aliyun/ai-agent-handbook/blob/main/02-build/%E7%AC%AC%204%20%E7%AB%A0%20%E4%BB%BB%E5%8A%A1%EF%BC%9A%E7%BC%96%E6%8E%92%E3%80%81%E9%95%BF%E7%A8%8B%E6%8E%A8%E8%BF%9B%E4%B8%8E%E5%8D%8F%E4%BD%9C%E6%B5%81%E8%BD%AC.md>
+- 行动：受控执行、验证反馈与交付准备：<https://github.com/aliyun/ai-agent-handbook/blob/main/02-build/%E7%AC%AC%206%20%E7%AB%A0%20%E8%A1%8C%E5%8A%A8%EF%BC%9A%E5%8F%97%E6%8E%A7%E6%89%A7%E8%A1%8C%E3%80%81%E9%AA%8C%E8%AF%81%E5%8F%8D%E9%A6%88%E4%B8%8E%E4%BA%A4%E4%BB%98%E5%87%86%E5%A4%87.md>
+
+### 具体 Harness / Runtime 实现
 
 - OpenAI Harness Engineering: https://openai.com/index/harness-engineering/
 - OpenAI Agents API: https://developers.openai.com/api/docs/guides/agents-api/overview
