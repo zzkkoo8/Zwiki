@@ -40,7 +40,8 @@ Sandbox / Environment
 5. [多 Agent 与 AI Gateway](multi-agent-gateway.md)：只有单 Agent 不够时再引入。
 6. [可观测、评估与 Badcase](observability-evaluation-badcase.md)：解决如何证明 Agent 真的变好了。
 7. [Agent 安全与治理](security-governance.md)：解决越权、注入、资产和审计问题。
-8. [运维 Agent 生产闭环](ops-agent-production-pattern.md)：把上述能力映射到 Linux/K8s/生产运维。
+8. [LLM Agent 十级成熟度与升级路线](llm-agent-maturity-levels.md)：从工具使用、Harness 到多 Agent 和受控自进化。
+9. [运维 Agent 生产闭环](ops-agent-production-pattern.md)：把上述能力映射到 Linux/K8s/生产运维。
 
 Coding Agent 的 Harness 实现另见 [Agent Harness 开发速查](../coding/agent-harness-development.md)。
 
