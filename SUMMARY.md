@@ -53,6 +53,7 @@
     * [多 Agent 与 AI Gateway](ai/agent-engineering/multi-agent-gateway.md)
     * [可观测、评估与 Badcase](ai/agent-engineering/observability-evaluation-badcase.md)
     * [Agent 安全与治理](ai/agent-engineering/security-governance.md)
+    * [LLM Agent 十级成熟度与升级路线](ai/agent-engineering/llm-agent-maturity-levels.md)
     * [运维 Agent 生产闭环](ai/agent-engineering/ops-agent-production-pattern.md)
   * [AI Coding](ai/coding/README.md)
     * [FDE 60 天技能表](ai/coding/fde-skills-roadmap.md)
